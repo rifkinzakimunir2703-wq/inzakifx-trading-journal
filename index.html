@@ -1,107 +1,89 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="id">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>InzakiFX Trading Journal</title>
   <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
 </head>
 <body>
-  <header class="topbar">
-    <div>
-      <div class="brand">Inzaki<span>FX</span></div>
-      <div class="subtitle">Trading Journal MVP</div>
-    </div>
-    <div class="actions">
-      <button id="exportBtn" class="secondary">Export CSV</button>
-      <button id="clearBtn" class="danger">Hapus Semua</button>
-    </div>
-  </header>
+<header class="topbar">
+  <div><b><span>Inzaki</span>FX</b><small>Trading Journal V2</small></div>
+  <button id="logoutBtn" class="secondary hidden">Logout</button>
+</header>
 
-  <main class="container">
-    <section class="hero">
+<main class="container">
+  <section id="authView" class="panel auth">
+    <h1>InzakiFX Journal</h1>
+    <p class="muted">Simpan jurnal trading kamu secara online.</p>
+    <div class="tabs">
+      <button id="loginTab" class="active">Login</button>
+      <button id="registerTab">Register</button>
+    </div>
+    <form id="authForm">
+      <input id="email" type="email" placeholder="Email" required>
+      <input id="password" type="password" placeholder="Password (min. 6 karakter)" minlength="6" required>
+      <input id="displayName" class="registerOnly hidden" placeholder="Nama tampilan">
+      <button id="authSubmit" type="submit">Login</button>
+    </form>
+    <p id="authMsg" class="msg"></p>
+  </section>
+
+  <section id="appView" class="hidden">
+    <div class="hero">
       <div>
         <h1>Trading Journal</h1>
-        <p>Catat, evaluasi, dan pantau performa trading kamu.</p>
+        <p class="muted">Catat, evaluasi, dan pantau performa trading kamu.</p>
       </div>
-      <button id="addTradeTop" class="primary">+ Tambah Trade</button>
-    </section>
-
-    <section class="stats">
-      <div class="card"><span>Total Trade</span><strong id="totalTrades">0</strong></div>
-      <div class="card"><span>Win Rate</span><strong id="winRate">0%</strong></div>
-      <div class="card"><span>Net P/L</span><strong id="netPL">$0.00</strong></div>
-      <div class="card"><span>Profit Factor</span><strong id="profitFactor">0.00</strong></div>
-      <div class="card"><span>Max Drawdown</span><strong id="maxDD">$0.00</strong></div>
-    </section>
-
-    <section class="grid">
-      <div class="panel">
-        <div class="panel-head">
-          <h2>Equity Curve</h2>
-          <span id="equityStart">$0</span>
-        </div>
-        <canvas id="equityChart"></canvas>
+      <div class="actions">
+        <button id="addTradeBtn">+ Tambah Trade</button>
+        <button id="exportBtn" class="secondary">Export CSV</button>
       </div>
+    </div>
 
-      <div class="panel">
-        <div class="panel-head">
-          <h2>Performance</h2>
-        </div>
-        <div id="performance" class="performance"></div>
-      </div>
+    <div class="cards">
+      <div class="card"><small>Total Trade</small><strong id="totalTrades">0</strong></div>
+      <div class="card"><small>Win Rate</small><strong id="winRate">0%</strong></div>
+      <div class="card"><small>Net P/L</small><strong id="netPL">$0.00</strong></div>
+      <div class="card"><small>Profit Factor</small><strong id="profitFactor">0.00</strong></div>
+      <div class="card"><small>Max Drawdown</small><strong id="maxDD">$0.00</strong></div>
+      <div class="card"><small>Best Day</small><strong id="bestDay">$0.00</strong></div>
+    </div>
+
+    <section class="panel">
+      <div class="sectionTitle"><h2>Equity Curve</h2><span id="equityLabel">$0.00</span></div>
+      <canvas id="equityChart"></canvas>
     </section>
 
     <section class="panel">
-      <div class="panel-head">
-        <h2>Riwayat Trade</h2>
-        <input id="search" class="search" placeholder="Cari symbol / strategi...">
-      </div>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Tanggal</th><th>Symbol</th><th>Side</th><th>Entry</th><th>Exit</th>
-              <th>Risk</th><th>R:R</th><th>P/L</th><th>Strategi</th><th></th>
-            </tr>
-          </thead>
-          <tbody id="tradeTable"></tbody>
-        </table>
-      </div>
-      <div id="empty" class="empty">Belum ada trade. Tambahkan trade pertama kamu.</div>
+      <div class="sectionTitle"><h2>Trade History</h2><input id="search" placeholder="Cari symbol/strategy..."></div>
+      <div id="tradeList" class="tradeList"></div>
     </section>
-  </main>
+  </section>
+</main>
 
-  <div id="modal" class="modal hidden">
-    <div class="modal-box">
-      <div class="modal-head">
-        <h2>Tambah Trade</h2>
-        <button id="closeModal" class="icon">×</button>
-      </div>
-      <form id="tradeForm">
-        <div class="form-grid">
-          <label>Tanggal<input type="datetime-local" id="date" required></label>
-          <label>Symbol<input id="symbol" placeholder="XAUUSD / BTCUSDT" required></label>
-          <label>Side
-            <select id="side"><option>BUY</option><option>SELL</option></select>
-          </label>
-          <label>Entry<input type="number" id="entry" step="any" required></label>
-          <label>Exit<input type="number" id="exit" step="any" required></label>
-          <label>Risk ($)<input type="number" id="risk" min="0" step="any" value="10" required></label>
-          <label>P/L ($)<input type="number" id="pl" step="any" required></label>
-          <label>Strategi<input id="strategy" placeholder="FVG BOS"></label>
-          <label>Timeframe<input id="timeframe" placeholder="5M"></label>
-          <label>Session<input id="session" placeholder="London / NY"></label>
-        </div>
-        <label>Catatan<textarea id="notes" placeholder="Kenapa entry? Apa yang bisa diperbaiki?"></textarea></label>
-        <div class="form-actions">
-          <button type="button" id="cancelBtn" class="secondary">Batal</button>
-          <button class="primary" type="submit">Simpan Trade</button>
-        </div>
-      </form>
-    </div>
+<div id="modal" class="modal hidden">
+  <div class="modalBox">
+    <div class="sectionTitle"><h2>Tambah Trade</h2><button id="closeModal" class="secondary">×</button></div>
+    <form id="tradeForm" class="gridForm">
+      <input id="tSymbol" placeholder="Symbol (XAUUSD, NASDAQ...)" required>
+      <select id="tSide"><option>BUY</option><option>SELL</option></select>
+      <input id="tEntry" type="number" step="any" placeholder="Entry">
+      <input id="tExit" type="number" step="any" placeholder="Exit">
+      <input id="tRisk" type="number" step="any" placeholder="Risk $">
+      <input id="tPL" type="number" step="any" placeholder="P/L $" required>
+      <input id="tStrategy" placeholder="Strategy">
+      <input id="tTF" placeholder="Timeframe (5M, 15M...)">
+      <input id="tSession" placeholder="Session (Asia/London/NY)">
+      <textarea id="tNotes" placeholder="Catatan"></textarea>
+      <button type="submit">Simpan Trade</button>
+    </form>
+    <p id="tradeMsg" class="msg"></p>
   </div>
+</div>
 
-  <script src="app.js"></script>
+<script src="app.js"></script>
 </body>
 </html>
