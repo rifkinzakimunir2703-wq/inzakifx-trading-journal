@@ -32,12 +32,108 @@
   </section>
 
   <section id="appView" class="hidden">
+    <nav class="mainNav">
+      <button class="navBtn active" data-page="globalPage">🌐 Global Dashboard</button>
+      <button class="navBtn" data-page="performancePage">📊 Journal Performance</button>
+      <button class="navBtn" data-page="accountsPage">🏦 Prop Accounts</button>
+      <button class="navBtn" data-page="payoutsPage">💰 Payouts</button>
+      <button class="navBtn" data-page="calendarPage">📅 Calendar</button>
+      <button class="navBtn" data-page="journalPage">📒 Trading Journal</button>
+    </nav>
+
+    <section id="globalPage" class="page">
+      <div class="hero"><div><h1>Global Dashboard</h1><p class="muted">Semua akun, biaya, payout, dan performa dalam satu layar.</p></div></div>
+      <div class="cards globalCards">
+        <div class="card"><small>Total Akun</small><strong id="gAccounts">0</strong></div>
+        <div class="card"><small>Total Biaya Beli</small><strong id="gFees">$0.00</strong></div>
+        <div class="card"><small>Total Payout</small><strong id="gPayouts">$0.00</strong></div>
+        <div class="card"><small>Total Trading P/L</small><strong id="gTradingPL">$0.00</strong></div>
+        <div class="card"><small>Net Setelah Biaya</small><strong id="gNet">$0.00</strong></div>
+        <div class="card"><small>Funded</small><strong id="gFunded">0</strong></div>
+        <div class="card"><small>Evaluation</small><strong id="gEval">0</strong></div>
+        <div class="card"><small>Failed</small><strong id="gFailed">0</strong></div>
+      </div>
+      <section class="panel">
+        <div class="sectionTitle"><h2>🏆 Performa Akun</h2><span>ROI</span></div>
+        <div id="globalAccountList"></div>
+      </section>
+      <section class="panel">
+        <div class="sectionTitle"><h2>⚠️ Risk Monitor</h2></div>
+        <div id="riskMonitor"></div>
+      </section>
+    </section>
+
+    <section id="performancePage" class="page hidden">
+  <div class="hero">
+    <div><h1>📊 Journal Performance</h1><p class="muted">Analisis keseluruhan semua trade dari seluruh akun.</p></div>
+  </div>
+  <section class="panel">
+    <div class="filters">
+      <select id="perfAccount"><option value="">Semua Akun</option></select>
+      <select id="perfStrategy"><option value="">Semua Strategi</option></select>
+      <select id="perfTF"><option value="">Semua Timeframe</option></select>
+      <select id="perfSession"><option value="">Semua Session</option></select>
+      <input id="perfFrom" type="date"><input id="perfTo" type="date">
+      <button id="perfReset" class="secondary">Reset</button>
+    </div>
+  </section>
+  <div class="cards performanceCards">
+    <div class="card"><small>Total Trade</small><strong id="pTotal">0</strong></div>
+    <div class="card"><small>Win Rate</small><strong id="pWinRate">0%</strong></div>
+    <div class="card"><small>Net P/L</small><strong id="pNet">$0.00</strong></div>
+    <div class="card"><small>Profit Factor</small><strong id="pPF">0.00</strong></div>
+    <div class="card"><small>Average Win</small><strong id="pAvgWin">$0.00</strong></div>
+    <div class="card"><small>Average Loss</small><strong id="pAvgLoss">$0.00</strong></div>
+    <div class="card"><small>Expectancy</small><strong id="pExpectancy">$0.00</strong></div>
+    <div class="card"><small>Max Drawdown</small><strong id="pMaxDD">$0.00</strong></div>
+    <div class="card"><small>Best Day</small><strong id="pBestDay">$0.00</strong></div>
+    <div class="card"><small>Worst Day</small><strong id="pWorstDay">$0.00</strong></div>
+    <div class="card"><small>Winning Trades</small><strong id="pWins">0</strong></div>
+    <div class="card"><small>Losing Trades</small><strong id="pLosses">0</strong></div>
+  </div>
+  <section class="panel"><div class="sectionTitle"><h2>📈 Equity Curve</h2><span id="perfEquity">$0.00</span></div><canvas id="performanceChart"></canvas></section>
+  <div class="twoCol">
+    <section class="panel"><div class="sectionTitle"><h2>🏦 Per Account</h2></div><div id="perfAccounts"></div></section>
+    <section class="panel"><div class="sectionTitle"><h2>🧠 Per Strategy</h2></div><div id="perfStrategies"></div></section>
+  </div>
+  <div class="twoCol">
+    <section class="panel"><div class="sectionTitle"><h2>⏱️ Per Timeframe</h2></div><div id="perfTimeframes"></div></section>
+    <section class="panel"><div class="sectionTitle"><h2>🌍 Per Session</h2></div><div id="perfSessions"></div></section>
+  </div>
+  <section class="panel"><div class="sectionTitle"><h2>📅 Daily Performance</h2></div><div id="perfDays"></div></section>
+</section>
+
+<section id="accountsPage" class="page hidden">
+      <div class="hero"><div><h1>Prop Firm Accounts</h1><p class="muted">Kelola seluruh akun dan statusnya.</p></div><button id="addAccountBtn">+ Tambah Akun</button></div>
+      <div id="accountList" class="accountGrid"></div>
+    </section>
+
+    <section id="payoutsPage" class="page hidden">
+      <div class="hero"><div><h1>Payout</h1><p class="muted">Catat semua payout dari akun.</p></div><button id="addPayoutBtn">+ Tambah Payout</button></div>
+      <div class="panel"><div id="payoutList"></div></div>
+    </section>
+
+    <section id="calendarPage" class="page hidden">
+      <div class="hero"><div><h1>Trading Calendar</h1><p class="muted">Profit/loss harian dari seluruh akun.</p></div></div>
+      <div class="panel"><div id="calendarGrid" class="calendarGrid"></div></div>
+    </section>
+
+    <section id="journalPage" class="page">
+      <div class="hero">
+        <div><h1>Trading Journal</h1><p class="muted">Catat dan evaluasi setiap trade.</p></div>
+        <div class="actions">
+          <button id="modeBtn" class="secondary">🎯 Prop Firm Mode</button>
+          <button id="addTradeBtn">+ Tambah Trade</button>
+          <button id="exportBtn" class="secondary">Export CSV</button>
+        </div>
+      </div>
     <div class="hero">
       <div>
         <h1>Trading Journal</h1>
         <p class="muted">Catat, evaluasi, dan pantau performa trading kamu.</p>
       </div>
       <div class="actions">
+        <button id="modeBtn" class="secondary">🎯 Prop Firm Mode</button>
         <button id="addTradeBtn">+ Tambah Trade</button>
         <button id="exportBtn" class="secondary">Export CSV</button>
       </div>
@@ -52,6 +148,28 @@
       <div class="card"><small>Best Day</small><strong id="bestDay">$0.00</strong></div>
     </div>
 
+    <section id="propPanel" class="panel hidden">
+      <div class="sectionTitle"><h2>🎯 Prop Firm Mode</h2><span id="propStatus">Evaluation</span></div>
+      <div class="propGrid">
+        <label>Account Size <input id="propAccount" type="number" value="5000"></label>
+        <label>Profit Target % <input id="propTargetPct" type="number" step="0.1" value="6"></label>
+        <label>Max Drawdown % <input id="propMaxDDPct" type="number" step="0.1" value="4"></label>
+        <label>Daily Loss % <input id="propDailyLossPct" type="number" step="0.1" value="2"></label>
+        <label>Consistency Limit % <input id="propConsistencyPct" type="number" step="0.1" value="20"></label>
+        <label>Min Buffer $ <input id="propBuffer" type="number" value="100"></label>
+      </div>
+      <div class="propStats">
+        <div class="card"><small>Target Profit</small><strong id="propTarget">$300.00</strong></div>
+        <div class="card"><small>Progress</small><strong id="propProgress">0%</strong></div>
+        <div class="card"><small>Max DD Limit</small><strong id="propDDLimit">$200.00</strong></div>
+        <div class="card"><small>Daily Loss Limit</small><strong id="propDailyLimit">$100.00</strong></div>
+        <div class="card"><small>Best Day</small><strong id="propBestDay">$0.00</strong></div>
+        <div class="card"><small>Consistency</small><strong id="propConsistency">0%</strong></div>
+      </div>
+      <p id="propWarning" class="msg"></p>
+      <button id="savePropBtn" type="button">Simpan Pengaturan Prop Firm</button>
+    </section>
+
     <section class="panel">
       <div class="sectionTitle"><h2>Equity Curve</h2><span id="equityLabel">$0.00</span></div>
       <canvas id="equityChart"></canvas>
@@ -64,11 +182,38 @@
   </section>
 </main>
 
+<div id="accountModal" class="modal hidden"><div class="modalBox">
+<div class="sectionTitle"><h2>Tambah Prop Firm Account</h2><button id="closeAccountModal" class="secondary">×</button></div>
+<form id="accountForm" class="gridForm">
+<input id="aFirm" placeholder="Prop Firm" required>
+<input id="aName" placeholder="Nama akun / ID" required>
+<input id="aSize" type="number" step="any" placeholder="Account Size $" required>
+<input id="aFee" type="number" step="any" placeholder="Biaya beli $" value="0">
+<select id="aStatus"><option>Phase 1</option><option>Phase 2</option><option>Funded</option><option>Payout</option><option>Failed</option><option>Closed</option></select>
+<input id="aTarget" type="number" step="any" placeholder="Target %" value="6">
+<input id="aMaxDD" type="number" step="any" placeholder="Max DD %" value="4">
+<input id="aDaily" type="number" step="any" placeholder="Daily Loss %" value="2">
+<input id="aConsistency" type="number" step="any" placeholder="Consistency %" value="20">
+<input id="aStart" type="date">
+<textarea id="aNotes" placeholder="Catatan akun"></textarea>
+<button type="submit">Simpan Akun</button>
+</form><p id="accountMsg" class="msg"></p></div></div>
+
+<div id="payoutModal" class="modal hidden"><div class="modalBox">
+<div class="sectionTitle"><h2>Tambah Payout</h2><button id="closePayoutModal" class="secondary">×</button></div>
+<form id="payoutForm">
+<select id="pAccount" required></select>
+<input id="pAmount" type="number" step="any" placeholder="Payout $" required>
+<input id="pDate" type="date" required>
+<select id="pStatus"><option>Paid</option><option>Pending</option><option>Rejected</option></select>
+<textarea id="pNote" placeholder="Catatan"></textarea>
+<button type="submit">Simpan Payout</button>
+</form><p id="payoutMsg" class="msg"></p></div></div>
 <div id="modal" class="modal hidden">
   <div class="modalBox">
     <div class="sectionTitle"><h2>Tambah Trade</h2><button id="closeModal" class="secondary">×</button></div>
     <form id="tradeForm" class="gridForm">
-      <input id="tSymbol" placeholder="Symbol (XAUUSD, NASDAQ...)" required>
+      <select id="tAccount" required><option value="">Pilih akun prop firm</option></select><input id="tSymbol" placeholder="Symbol (XAUUSD, NASDAQ...)" required>
       <select id="tSide"><option>BUY</option><option>SELL</option></select>
       <input id="tEntry" type="number" step="any" placeholder="Entry">
       <input id="tExit" type="number" step="any" placeholder="Exit">
