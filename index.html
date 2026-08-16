@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>InzakiFX Trading Journal</title>
+  <title>INZAKI Trading Journal</title>
   <link rel="stylesheet" href="style.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="config.js"></script>
@@ -16,7 +16,7 @@
 
 <main class="container">
   <section id="authView" class="panel auth">
-    <h1>InzakiFX Journal</h1>
+    <h1>INZAKI Journal</h1>
     <p class="muted">Simpan jurnal trading kamu secara online.</p>
     <div class="tabs">
       <button id="loginTab" class="active">Login</button>
@@ -32,7 +32,7 @@
   </section>
 
   <section id="appView" class="hidden">
-    <div class="ghBrand"><span class="ghMark">◆</span><strong>InzakiFX</strong><span class="ghRepo">Trading Journal</span></div><nav class="mainNav">
+    <div class="ghBrand"><span class="ghMark">◆</span><strong>INZAKI</strong><span class="ghRepo">Trading Journal</span></div><nav class="mainNav">
       <button class="navBtn active" data-page="globalPage">🌐 Global Dashboard</button>
       <button type="button" class="navBtn" data-page="performancePage" onclick="openPage(\'performancePage\');return false;">📊 Journal Performance</button>
       <button type="button" class="navBtn" data-page="accountsPage" onclick="openPage(\'accountsPage\');return false;">🏦 Prop Accounts</button>
@@ -196,7 +196,7 @@
 </main>
 
 <div id="accountModal" class="modal hidden"><div class="modalBox">
-<div class="sectionTitle"><h2>Tambah Prop Firm Account</h2><button id="closeAccountModal" class="secondary">×</button></div>
+<div class="sectionTitle"><h2 id="accountModalTitle">Tambah Prop Firm Account</h2><button id="closeAccountModal" class="secondary">×</button></div>
 <form id="accountForm" class="gridForm">
 <input id="aFirm" placeholder="Prop Firm" required>
 <input id="aName" placeholder="Nama akun / ID" required>
@@ -209,7 +209,7 @@
 <input id="aConsistency" type="number" step="any" placeholder="Consistency %" value="20">
 <input id="aStart" type="date">
 <textarea id="aNotes" placeholder="Catatan akun"></textarea>
-<button type="submit">Simpan Akun</button>
+<button type="submit" id="accountSubmitBtn">Simpan Akun</button>
 </form><p id="accountMsg" class="msg"></p></div></div>
 
 <div id="payoutModal" class="modal hidden"><div class="modalBox">

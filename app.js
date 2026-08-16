@@ -1,6 +1,15 @@
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
 let currentUser = null, trades = [], authMode = "login", accounts = [], payouts = [];
 let prop = {account:5000,targetPct:6,maxDDPct:4,dailyLossPct:2,consistencyPct:20,buffer:100};
+let editingAccountId = null;
+function setValueClass(id, value, mode="normal"){
+  const el=$(id); if(!el)return;
+  el.classList.remove("positive","negative","neutralValue");
+  if(mode==="winrate") el.classList.add(Number(value)>=50?"positive":"negative");
+  else if(Number(value)>0) el.classList.add("positive");
+  else if(Number(value)<0) el.classList.add("negative");
+  else el.classList.add("neutralValue");
+}
 
 const $ = id => document.getElementById(id);
 const money = n => `${n < 0 ? "-" : ""}$${Math.abs(Number(n)||0).toFixed(2)}`;
@@ -161,7 +170,7 @@ function renderPerformance(){
 function drawPerformanceChart(ts){
   const c=$("performanceChart");if(!c)return;const ctx=c.getContext("2d");const w=c.width=c.clientWidth*2,h=c.height=280*2;ctx.clearRect(0,0,w,h);if(!ts.length)return;
   let eq=0;const pts=[0];ts.forEach(t=>{eq+=Number(t.pl||0);pts.push(eq)});let min=Math.min(...pts),max=Math.max(...pts);if(min===max){min-=1;max+=1;}
-  ctx.beginPath();pts.forEach((v,i)=>{const x=i/(pts.length-1)*w,y=h-(v-min)/(max-min)*h;if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y)});ctx.stroke();
+  ctx.beginPath();ctx.strokeStyle="#58a6ff";ctx.lineWidth=5;pts.forEach((v,i)=>{const x=i/(pts.length-1)*w,y=h-(v-min)/(max-min)*h;if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y)});ctx.stroke();
 }
 ["perfAccount","perfStrategy","perfTF","perfSession","perfFrom","perfTo"].forEach(id=>{if($(id))$(id).addEventListener("change",renderPerformance);});
 if($("perfReset"))$("perfReset").onclick=()=>{["perfAccount","perfStrategy","perfTF","perfSession","perfFrom","perfTo"].forEach(id=>{if($(id))$(id).value=""});renderPerformance();};
@@ -190,7 +199,7 @@ function renderAccounts(){
       <div class="accountMetrics"><div><small>Size</small><b>${money(a.account_size)}</b></div><div><small>Fee</small><b>${money(a.purchase_fee)}</b></div><div><small>Trading P/L</small><b class="${pl>=0?"positive":"negative"}">${money(pl)}</b></div><div><small>Payout</small><b>${money(paid)}</b></div></div>
       <div class="progress"><i style="width:${Math.min(100,Math.max(0,progress))}%"></i></div>
       <small>Target ${Number(a.target_pct)}% · Max DD ${Number(a.max_dd_pct)}% · Daily ${Number(a.daily_loss_pct)}% · Consistency ${Number(a.consistency_pct)}%</small>
-      <div class="accountActions"><button class="secondary" onclick="setAccountStatus('${a.id}')">Ubah Status</button><button class="danger" onclick="deleteAccount('${a.id}')">Hapus</button></div>
+      <div class="accountActions"><button class="secondary" onclick="editAccount('${a.id}')">✏️ Edit Account</button><button class="secondary" onclick="setAccountStatus('${a.id}')">Ubah Status</button><button class="danger" onclick="deleteAccount('${a.id}')">Hapus</button></div>
     </div>`;
   }).join("") || '<p class="muted">Belum ada akun prop firm.</p>';
 }
@@ -228,7 +237,8 @@ function renderGlobal(){
    ["gFees",money(-fees)],["gPayouts",money(pays)],["gNet",money(netCash)],["gCashROI",roi.toFixed(1)+"%"],
    ["gAccounts",accounts.length],["gPhase1",countStatus("phase 1")],["gPhase2",countStatus("phase 2")],["gFunded",countStatus("funded")]]
   .forEach(([id,v])=>{if($(id))$(id).textContent=v;});
-  ["gTradingPL","gNet"].forEach(id=>{const e=$(id);if(e){e.classList.remove("positive","negative");const n=parseFloat(e.textContent.replace(/[^0-9.-]/g,""));e.classList.add(n>=0?"positive":"negative")}});
+  setValueClass("gTradingPL",pl); setValueClass("gNet",netCash); setValueClass("gFees",-fees); setValueClass("gPayouts",pays); setValueClass("gCashROI",roi);
+  setValueClass("gWinRate",wr,"winrate"); setValueClass("gProfitFactor",pf);
   const list=$("globalAccountList");
   if(list){
     list.innerHTML=accounts.map(a=>{
@@ -242,20 +252,35 @@ function renderGlobal(){
 function drawGlobalEquity(){
   const c=$("globalEquityChart"); if(!c)return;
   const ts=[...trades].sort((a,b)=>new Date(a.trade_date)-new Date(b.trade_date));
-  const ctx=c.getContext("2d"), w=c.width=c.clientWidth*2, h=c.height=230*2; ctx.clearRect(0,0,w,h);
+  const ctx=c.getContext("2d"), w=c.width=c.clientWidth*2, h=c.height=250*2;
+  ctx.clearRect(0,0,w,h);
   if(!ts.length){if($("gEquityLabel"))$("gEquityLabel").textContent="$0.00";return;}
-  let eq=0;const pts=[0];ts.forEach(t=>{eq+=Number(t.pl||0);pts.push(eq)});
+  let eq=0; const pts=[0]; ts.forEach(t=>{eq+=Number(t.pl||0);pts.push(eq)});
   if($("gEquityLabel"))$("gEquityLabel").textContent=money(eq);
-  let min=Math.min(...pts),max=Math.max(...pts);if(min===max){min-=1;max+=1}
-  ctx.beginPath();pts.forEach((v,i)=>{const x=i/(pts.length-1)*w,y=h-(v-min)/(max-min)*h;i?ctx.lineTo(x,y):ctx.moveTo(x,y)});ctx.stroke();
+  let min=Math.min(...pts,0), max=Math.max(...pts,0); if(min===max){min-=1;max+=1}
+  const X=i=>i/(pts.length-1)*w, Y=v=>h-(v-min)/(max-min)*h;
+  const zero=Y(0);
+  // soft fill under curve
+  const area=ctx.createLinearGradient(0,0,0,h);
+  area.addColorStop(0,"rgba(63,185,80,.18)"); area.addColorStop(.55,"rgba(63,185,80,.04)"); area.addColorStop(1,"rgba(248,81,73,.08)");
+  ctx.beginPath();pts.forEach((v,i)=>i?ctx.lineTo(X(i),Y(v)):ctx.moveTo(X(i),Y(v)));
+  ctx.lineTo(w,h);ctx.lineTo(0,h);ctx.closePath();ctx.fillStyle=area;ctx.fill();
+  // zero line
+  ctx.beginPath();ctx.moveTo(0,zero);ctx.lineTo(w,zero);ctx.strokeStyle="rgba(139,148,158,.35)";ctx.lineWidth=2;ctx.stroke();
+  // segment colors: green above/positive move, red below/negative move
+  for(let i=1;i<pts.length;i++){
+    ctx.beginPath();ctx.moveTo(X(i-1),Y(pts[i-1]));ctx.lineTo(X(i),Y(pts[i]));
+    ctx.lineWidth=5;
+    ctx.strokeStyle=pts[i]>=pts[i-1]?"#3fb950":"#f85149";
+    ctx.lineCap="round";ctx.stroke();
+  }
 }
-
 function renderCalendar(){
   const box=$("calendarGrid");if(!box)return;
   const now=new Date(), y=now.getFullYear(), m=now.getMonth(), first=new Date(y,m,1).getDay(), days=new Date(y,m+1,0).getDate();
   const names=["Min","Sen","Sel","Rab","Kam","Jum","Sab"];let h=names.map(n=>`<div class="calHead">${n}</div>`).join("");
   for(let i=0;i<first;i++)h+="<div></div>";
-  for(let d=1;d<=days;d++){const key=new Date(y,m,d).toISOString().slice(0,10);const dayPL=trades.filter(t=>new Date(t.trade_date).toISOString().slice(0,10)===key).reduce((s,t)=>s+Number(t.pl||0),0);h+=`<button type="button" class="calDay ${dayPL>0?"calWin":dayPL<0?"calLoss":""}" data-date="${key}"><b>${d}</b><small>${dayPL?money(dayPL):"—"}</small></button>`}
+  for(let d=1;d<=days;d++){const dt=new Date(y,m,d);const key=dt.toLocaleDateString("en-CA");const dayPL=trades.filter(t=>new Date(t.trade_date).toLocaleDateString("en-CA")===key).reduce((s,t)=>s+Number(t.pl||0),0);const today=key===new Date().toLocaleDateString("en-CA");h+=`<button type="button" class="calDay ${dayPL>0?"calWin":dayPL<0?"calLoss":""} ${today?"calToday":""}" data-date="${key}"><b>${d}</b><small>${dayPL?money(dayPL):"—"}</small></button>`}
   box.innerHTML=h;
 }
 function openPage(pageId){
@@ -287,9 +312,29 @@ document.addEventListener("click",function(e){
   }
 });
 
-$("addAccountBtn").onclick=()=>show("accountModal",true);$("closeAccountModal").onclick=()=>show("accountModal",false);
+$("addAccountBtn").onclick=()=>{editingAccountId=null;$("accountForm").reset();$("accountModalTitle").textContent="Tambah Prop Firm Account";$("accountSubmitBtn").textContent="Simpan Akun";$("aStatus").value="Phase 1";$("aTarget").value=6;$("aMaxDD").value=4;$("aDaily").value=2;$("aConsistency").value=20;show("accountModal",true)};
+$("closeAccountModal").onclick=()=>{editingAccountId=null;show("accountModal",false)};
 $("addPayoutBtn").onclick=()=>{fillPayoutAccounts();show("payoutModal",true)};$("closePayoutModal").onclick=()=>show("payoutModal",false);
-$("accountForm").onsubmit=async e=>{e.preventDefault();const n=id=>parseFloat($(id).value)||0;const row={user_id:currentUser.id,firm:$("aFirm").value.trim(),account_name:$("aName").value.trim(),account_size:n("aSize"),purchase_fee:n("aFee"),status:$("aStatus").value,target_pct:n("aTarget"),max_dd_pct:n("aMaxDD"),daily_loss_pct:n("aDaily"),consistency_pct:n("aConsistency"),start_date:$("aStart").value||null,notes:$("aNotes").value.trim()};const {error}=await sb.from("prop_accounts").insert(row);if(error){$("accountMsg").textContent=error.message;return}e.target.reset();show("accountModal",false);await loadAccounts();};
+async function editAccount(id){
+  const a=accounts.find(x=>x.id===id);if(!a)return;
+  editingAccountId=id;
+  $("aFirm").value=a.firm||"";$("aName").value=a.account_name||"";$("aSize").value=a.account_size??0;$("aFee").value=a.purchase_fee??0;
+  $("aStatus").value=a.status||"Phase 1";$("aTarget").value=a.target_pct??6;$("aMaxDD").value=a.max_dd_pct??4;$("aDaily").value=a.daily_loss_pct??2;$("aConsistency").value=a.consistency_pct??20;
+  $("aStart").value=a.start_date||"";$("aNotes").value=a.notes||"";
+  $("accountModalTitle").textContent="Edit Prop Firm Account";$("accountSubmitBtn").textContent="Update Account";$("accountMsg").textContent="";
+  show("accountModal",true);
+}
+window.editAccount=editAccount;
+$("accountForm").onsubmit=async e=>{
+  e.preventDefault();$("accountMsg").textContent="Menyimpan...";
+  const n=id=>parseFloat($(id).value)||0;
+  const row={firm:$("aFirm").value.trim(),account_name:$("aName").value.trim(),account_size:n("aSize"),purchase_fee:n("aFee"),status:$("aStatus").value,target_pct:n("aTarget"),max_dd_pct:n("aMaxDD"),daily_loss_pct:n("aDaily"),consistency_pct:n("aConsistency"),start_date:$("aStart").value||null,notes:$("aNotes").value.trim()};
+  let result;
+  if(editingAccountId) result=await sb.from("prop_accounts").update(row).eq("id",editingAccountId).eq("user_id",currentUser.id);
+  else result=await sb.from("prop_accounts").insert({...row,user_id:currentUser.id});
+  if(result.error){$("accountMsg").textContent=result.error.message;return}
+  e.target.reset();editingAccountId=null;show("accountModal",false);await loadAccounts();
+};
 $("payoutForm").onsubmit=async e=>{e.preventDefault();const row={user_id:currentUser.id,account_id:$("pAccount").value,amount:parseFloat($("pAmount").value)||0,payout_date:$("pDate").value,status:$("pStatus").value,note:$("pNote").value.trim()};const {error}=await sb.from("payouts").insert(row);if(error){$("payoutMsg").textContent=error.message;return}e.target.reset();show("payoutModal",false);await loadPayouts();};
 
 async function loadTrades(){
@@ -302,13 +347,16 @@ function render(){
   const total=trades.length, wins=trades.filter(t=>Number(t.pl)>0), losses=trades.filter(t=>Number(t.pl)<0);
   const net=trades.reduce((a,t)=>a+Number(t.pl||0),0);
   const grossWin=wins.reduce((a,t)=>a+Number(t.pl),0), grossLoss=Math.abs(losses.reduce((a,t)=>a+Number(t.pl),0));
-  $("totalTrades").textContent=total; $("winRate").textContent=total?(wins.length/total*100).toFixed(1)+"%":"0%";
+  const wr=total?(wins.length/total*100):0;
+  $("totalTrades").textContent=total; $("winRate").textContent=wr.toFixed(1)+"%";
   $("netPL").textContent=money(net); $("profitFactor").textContent=grossLoss?(grossWin/grossLoss).toFixed(2):grossWin?"∞":"0.00";
+  setValueClass("winRate",wr,"winrate"); setValueClass("netPL",net); setValueClass("profitFactor",grossLoss?grossWin/grossLoss:(grossWin?Infinity:0));
   const eq=[]; let e=0, peak=0, dd=0;
   trades.forEach(t=>{e+=Number(t.pl||0);peak=Math.max(peak,e);dd=Math.max(dd,peak-e);eq.push(e)});
   $("maxDD").textContent=money(-dd); $("equityLabel").textContent=money(e);
+  setValueClass("maxDD",-dd); setValueClass("equityLabel",e);
   const days={}; trades.forEach(t=>{const d=new Date(t.trade_date).toISOString().slice(0,10);days[d]=(days[d]||0)+Number(t.pl||0)});
-  $("bestDay").textContent=money(Math.max(0,...Object.values(days)));
+  const bestDay=Math.max(0,...Object.values(days)); $("bestDay").textContent=money(bestDay); setValueClass("bestDay",bestDay);
   const q=$("search").value.toLowerCase();
   const filtered=trades.filter(t=>(t.symbol+" "+(t.strategy||"")+" "+(t.session||"")).toLowerCase().includes(q));
   $("tradeList").innerHTML=filtered.slice().reverse().map(t=>`

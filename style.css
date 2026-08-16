@@ -125,3 +125,45 @@ input,select,textarea{border-radius:7px!important;padding:9px 11px!important}
 
 .dashSection{margin:0 0 22px}.dashSectionHead{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px}.dashSectionHead>div{display:flex;gap:10px;align-items:flex-start}.dashSectionHead h2{margin:0;font-size:17px}.dashSectionHead p{margin:2px 0 0;color:var(--muted);font-size:12px}.dashIcon{font-size:18px}.dashTag{font-size:10px;letter-spacing:.1em;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:4px 7px}.globalAccountList{margin-top:10px;border:1px solid var(--line);border-radius:9px;background:var(--surface)}.globalAccountRow{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-bottom:1px solid var(--line);gap:12px}.globalAccountRow:last-child{border-bottom:0}.globalAccountRow>div{display:flex;align-items:center;gap:9px}.dashStatus{font-size:10px;border:1px solid var(--line);border-radius:999px;padding:3px 7px;color:var(--muted)}#globalEquityChart{width:100%;height:230px}
 @media(max-width:600px){.dashSectionHead{gap:8px}.dashTag{display:none}.globalAccountRow{display:block}.globalAccountRow>div:last-child{margin-top:5px}.globalAccountRow>div:first-child{justify-content:space-between}}
+
+/* V6.1 semantic colors */
+.positive{color:#3fb950!important}.negative{color:#f85149!important}.neutralValue{color:#e6edf3!important}
+.card strong.positive,.card strong.negative{font-weight:650}
+.calWin{background:rgba(63,185,80,.18)!important;border-color:rgba(63,185,80,.55)!important}
+.calLoss{background:rgba(248,81,73,.14)!important;border-color:rgba(248,81,73,.5)!important}
+.calToday{box-shadow:inset 0 0 0 1px #58a6ff!important}
+.accountActions{display:flex;gap:7px;flex-wrap:wrap;margin-top:12px}
+.accountActions button{font-size:12px!important}
+
+/* V6.2 responsive/mobile polish */
+#globalEquityChart,#performanceChart{display:block;width:100%;height:250px;border-radius:8px}
+@media(max-width:760px){
+  body{width:100%;max-width:none;padding:0 10px 78px!important;overflow-x:hidden!important}
+  .ghBrand{height:48px;margin:0 -2px 8px;padding:0 4px!important}
+  .mainNav{width:100%!important;max-width:none!important;overflow-x:auto!important;justify-content:flex-start!important;gap:2px!important;scrollbar-width:none}
+  .mainNav::-webkit-scrollbar{display:none}
+  .navBtn{flex:0 0 auto!important;min-width:56px!important;white-space:nowrap!important;font-size:10px!important;padding:7px 8px!important}
+  .page{width:100%!important;overflow:hidden!important}
+  .hero{margin-bottom:14px!important;padding:10px 0!important}
+  .hero h1{font-size:20px!important}
+  .cards,.globalCards,.performanceCards{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:8px!important}
+  .card{min-width:0!important;padding:12px!important;overflow:hidden}
+  .card strong{font-size:18px!important;overflow-wrap:anywhere}
+  .panel{padding:12px!important;margin-bottom:10px!important}
+  .twoCol{grid-template-columns:1fr!important}
+  .filters{grid-template-columns:1fr 1fr!important;gap:7px!important}
+  .filters input,.filters select{width:100%!important;min-width:0!important}
+  .tableWrap,.table-responsive{overflow-x:auto!important;-webkit-overflow-scrolling:touch}
+  table{min-width:620px}
+  .globalAccountRow{padding:10px!important}
+  #globalEquityChart,#performanceChart{height:190px!important}
+  .modalBox{width:calc(100vw - 20px)!important;max-height:88vh!important;overflow-y:auto!important}
+  input,select,textarea,button{min-height:40px}
+}
+@media(max-width:390px){
+  body{padding-left:8px!important;padding-right:8px!important}
+  .cards,.globalCards,.performanceCards{grid-template-columns:1fr 1fr!important}
+  .card small{font-size:10px!important}.card strong{font-size:17px!important}
+  .navBtn{min-width:50px!important;padding-left:5px!important;padding-right:5px!important}
+  #globalEquityChart,#performanceChart{height:165px!important}
+}
