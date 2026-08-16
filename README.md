@@ -1,0 +1,1 @@
+# inzakifx-trading-journal
