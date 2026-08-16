@@ -171,3 +171,15 @@ input,select,textarea{border-radius:7px!important;padding:9px 11px!important}
 .accountOverviewStats{display:flex!important;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end}
 .consistencyBadge{font-size:11px;border:1px solid var(--line);border-radius:999px;padding:4px 8px;background:var(--surface2)}
 @media(max-width:600px){.accountOverviewStats{justify-content:flex-start;margin-top:6px}}
+
+/* V7 polished UX */
+:root{--success:#3fb950;--danger2:#f85149;--blue:#58a6ff}
+.topbar{display:none!important}
+.eyebrow{font-size:11px;letter-spacing:.12em;color:var(--muted);font-weight:650}
+.healthGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.healthGrid>div{padding:12px;border:1px solid var(--line);border-radius:8px;background:var(--surface2)}.healthGrid small{display:block;color:var(--muted);font-size:11px}.healthGrid strong{display:block;font-size:18px;margin-top:4px}
+.accountRuleLine{display:flex;flex-wrap:wrap;gap:8px;color:var(--muted);font-size:11px;margin-top:8px}.accountRuleLine span{padding:3px 7px;border:1px solid var(--line);border-radius:999px}
+.emptyState{text-align:center;padding:28px!important}.emptyState p{max-width:420px;margin:6px auto 14px}
+.calendarToolbar{display:flex;align-items:center;justify-content:center;gap:8px;margin:0 0 10px}.calendarToolbar strong{min-width:150px;text-align:center}
+.calEmpty{min-height:58px}.calDay{min-height:62px!important;transition:transform .12s,border-color .12s,background .12s}.calDay:hover{transform:translateY(-1px)}.calWin{background:rgba(63,185,80,.12)!important;border-color:rgba(63,185,80,.35)!important}.calLoss{background:rgba(248,81,73,.12)!important;border-color:rgba(248,81,73,.35)!important}.calToday{box-shadow:inset 0 0 0 2px var(--blue)!important}.calWin small{color:var(--success)!important}.calLoss small{color:var(--danger2)!important}
+.status.phase1,.status.phase2{background:rgba(255,193,7,.1);color:#d9a441;border-color:rgba(255,193,7,.25)}.status.funded{background:rgba(63,185,80,.1);color:var(--success);border-color:rgba(63,185,80,.25)}.status.failed,.status.closed{background:rgba(248,81,73,.1);color:var(--danger2);border-color:rgba(248,81,73,.25)}
+@media(max-width:760px){.healthGrid{grid-template-columns:repeat(2,1fr)}.calendarToolbar{justify-content:space-between}.calendarToolbar strong{min-width:auto}.calDay{min-height:54px!important}}

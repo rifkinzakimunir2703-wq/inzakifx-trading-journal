@@ -2,6 +2,7 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
 let currentUser = null, trades = [], authMode = "login", accounts = [], payouts = [];
 let prop = {account:5000,targetPct:6,maxDDPct:4,dailyLossPct:2,consistencyPct:20,buffer:100};
 let editingAccountId = null;
+let calendarCursor = new Date();
 function setValueClass(id, value, mode="normal"){
   const el=$(id); if(!el)return;
   el.classList.remove("positive","negative","neutralValue");
@@ -193,15 +194,25 @@ function renderAccounts(){
     const paid=payouts.filter(p=>p.account_id===a.id&&p.status==="Paid").reduce((s,p)=>s+Number(p.amount||0),0);
     const target=Number(a.account_size)*Number(a.target_pct)/100;
     const progress=target?Math.max(0,pl/target*100):0;
-    const statusClass=(a.status||"").toLowerCase().replace(" ","");
+    const consistency=getAccountConsistency(a.id);
+    const rule=Number(a.consistency_pct||0);
+    const consistencyClass=ats.length?(!rule||consistency<=rule?"positive":"negative"):"neutralValue";
+    const statusClass=(a.status||"").toLowerCase().replace(/\s+/g,"");
     return `<div class="panel accountCard">
       <div class="accountTop"><div><h2>${esc(a.firm)}</h2><small>${esc(a.account_name)}</small></div><span class="status ${statusClass}">${esc(a.status)}</span></div>
-      <div class="accountMetrics"><div><small>Size</small><b>${money(a.account_size)}</b></div><div><small>Fee</small><b>${money(a.purchase_fee)}</b></div><div><small>Trading P/L</small><b class="${pl>=0?"positive":"negative"}">${money(pl)}</b></div><div><small>Payout</small><b>${money(paid)}</b></div></div>
+      <div class="accountMetrics">
+        <div><small>Size</small><b>${money(a.account_size)}</b></div>
+        <div><small>Fee</small><b class="negative">${money(-Number(a.purchase_fee||0))}</b></div>
+        <div><small>Trading P/L</small><b class="${pl>=0?"positive":"negative"}">${money(pl)}</b></div>
+        <div><small>Payout</small><b class="${paid>0?"positive":""}">${money(paid)}</b></div>
+        <div><small>Consistency</small><b class="${consistencyClass}">${ats.length?consistency.toFixed(1)+"%":"—"}</b></div>
+        <div><small>Rule</small><b>${rule?rule+"%":"—"}</b></div>
+      </div>
       <div class="progress"><i style="width:${Math.min(100,Math.max(0,progress))}%"></i></div>
-      <small>Target ${Number(a.target_pct)}% · Max DD ${Number(a.max_dd_pct)}% · Daily ${Number(a.daily_loss_pct)}% · Consistency ${Number(a.consistency_pct)}%</small>
+      <div class="accountRuleLine"><span>Target ${Number(a.target_pct)}%</span><span>Max DD ${Number(a.max_dd_pct)}%</span><span>Daily ${Number(a.daily_loss_pct)}%</span><span>Consistency ${rule}%</span></div>
       <div class="accountActions"><button class="secondary" onclick="editAccount('${a.id}')">✏️ Edit Account</button><button class="secondary" onclick="setAccountStatus('${a.id}')">Ubah Status</button><button class="danger" onclick="deleteAccount('${a.id}')">Hapus</button></div>
     </div>`;
-  }).join("") || '<p class="muted">Belum ada akun prop firm.</p>';
+  }).join("") || '<div class="panel emptyState"><strong>Belum ada akun Prop Firm</strong><p class="muted">Tambahkan akun pertama untuk mulai melacak biaya, trade, payout, dan consistency.</p><button onclick="document.getElementById(\'addAccountBtn\').click()">+ Tambah Akun</button></div>';
 }
 async function setAccountStatus(id){
   const a=accounts.find(x=>x.id===id); if(!a)return;
@@ -251,6 +262,18 @@ function renderGlobal(){
   .forEach(([id,v])=>{if($(id))$(id).textContent=v;});
   setValueClass("gTradingPL",pl); setValueClass("gNet",netCash); setValueClass("gFees",-fees); setValueClass("gPayouts",pays); setValueClass("gCashROI",roi);
   setValueClass("gWinRate",wr,"winrate"); setValueClass("gProfitFactor",pf);
+  const todayKey=new Date().toISOString().slice(0,10);
+  const daily={};
+  trades.forEach(t=>{const d=new Date(t.trade_date).toISOString().slice(0,10);daily[d]=(daily[d]||0)+Number(t.pl||0)});
+  const todayPL=daily[todayKey]||0, dayVals=Object.values(daily);
+  const bestDay=dayVals.length?Math.max(...dayVals):0, worstDay=dayVals.length?Math.min(...dayVals):0;
+  const riskCount=accounts.filter(a=>{
+    const c=getAccountConsistency(a.id), r=Number(a.consistency_pct||0);
+    return r>0 && c>r;
+  }).length;
+  [["gTodayPL",money(todayPL)],["gBestDay",money(bestDay)],["gWorstDay",money(worstDay)],["gRiskAccounts",riskCount]]
+    .forEach(([id,v])=>{if($(id))$(id).textContent=v;});
+  setValueClass("gTodayPL",todayPL);setValueClass("gBestDay",bestDay);setValueClass("gWorstDay",worstDay);
   const list=$("globalAccountList");
   if(list){
     list.innerHTML=accounts.map(a=>{
@@ -292,12 +315,25 @@ function drawGlobalEquity(){
 }
 function renderCalendar(){
   const box=$("calendarGrid");if(!box)return;
-  const now=new Date(), y=now.getFullYear(), m=now.getMonth(), first=new Date(y,m,1).getDay(), days=new Date(y,m+1,0).getDate();
+  const now=new Date(calendarCursor), y=now.getFullYear(), m=now.getMonth();
+  const first=new Date(y,m,1).getDay(), days=new Date(y,m+1,0).getDate();
+  const monthTitle=now.toLocaleDateString("id-ID",{month:"long",year:"numeric"});
+  if($("calTitle"))$("calTitle").textContent=monthTitle.charAt(0).toUpperCase()+monthTitle.slice(1);
   const names=["Min","Sen","Sel","Rab","Kam","Jum","Sab"];let h=names.map(n=>`<div class="calHead">${n}</div>`).join("");
-  for(let i=0;i<first;i++)h+="<div></div>";
-  for(let d=1;d<=days;d++){const dt=new Date(y,m,d);const key=dt.toLocaleDateString("en-CA");const dayPL=trades.filter(t=>new Date(t.trade_date).toLocaleDateString("en-CA")===key).reduce((s,t)=>s+Number(t.pl||0),0);const today=key===new Date().toLocaleDateString("en-CA");h+=`<button type="button" class="calDay ${dayPL>0?"calWin":dayPL<0?"calLoss":""} ${today?"calToday":""}" data-date="${key}"><b>${d}</b><small>${dayPL?money(dayPL):"—"}</small></button>`}
+  for(let i=0;i<first;i++)h+="<div class=\"calEmpty\"></div>";
+  for(let d=1;d<=days;d++){
+    const dt=new Date(y,m,d), key=dt.toISOString().slice(0,10);
+    const dayPL=trades.filter(t=>new Date(t.trade_date).toISOString().slice(0,10)===key).reduce((s,t)=>s+Number(t.pl||0),0);
+    const today=key===new Date().toISOString().slice(0,10);
+    h+=`<button type="button" class="calDay ${dayPL>0?"calWin":dayPL<0?"calLoss":""} ${today?"calToday":""}" data-date="${key}">
+      <b>${d}</b><small>${dayPL?money(dayPL):"—"}</small></button>`;
+  }
   box.innerHTML=h;
 }
+if($("calPrev"))$("calPrev").onclick=()=>{calendarCursor.setMonth(calendarCursor.getMonth()-1);renderCalendar();};
+if($("calNext"))$("calNext").onclick=()=>{calendarCursor.setMonth(calendarCursor.getMonth()+1);renderCalendar();};
+if($("calToday"))$("calToday").onclick=()=>{calendarCursor=new Date();renderCalendar();};
+
 function openPage(pageId){
   document.querySelectorAll(".page").forEach(p=>p.classList.add("hidden"));
   document.querySelectorAll(".navBtn").forEach(b=>b.classList.toggle("active", b.dataset.page===pageId));
@@ -408,3 +444,8 @@ $("exportBtn").onclick=()=>{
   const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="inzakifx-trades.csv";a.click();URL.revokeObjectURL(a.href);
 };
 init();
+
+document.querySelectorAll(".navBtn").forEach(btn=>{
+  btn.addEventListener("click",e=>{e.preventDefault();openPage(btn.dataset.page);});
+});
+window.addEventListener("resize",()=>{if(!$("appView")?.classList.contains("hidden")){drawGlobalEquity();drawPerformanceChart(getPerfTrades());}});

@@ -10,7 +10,7 @@
 </head>
 <body>
 <header class="topbar">
-  <div><b><span>Inzaki</span>FX</b><small>Trading Journal V2</small></div>
+  <div><b>INZAKI</b><small>Trading Journal</small></div>
   <button id="logoutBtn" class="secondary hidden">Logout</button>
 </header>
 
@@ -82,6 +82,16 @@
     <div id="globalAccountList" class="globalAccountList"></div>
   </section>
 
+  <section class="panel quickHealth">
+    <div class="sectionTitle"><h2>⚡ Today & Health</h2><span id="gTodayLabel">Hari ini</span></div>
+    <div class="healthGrid">
+      <div><small>Today P/L</small><strong id="gTodayPL">$0.00</strong></div>
+      <div><small>Best Day</small><strong id="gBestDay">$0.00</strong></div>
+      <div><small>Worst Day</small><strong id="gWorstDay">$0.00</strong></div>
+      <div><small>Accounts at Risk</small><strong id="gRiskAccounts">0</strong></div>
+    </div>
+  </section>
+
   <section class="panel">
     <div class="sectionTitle"><h2>📊 Equity Overview</h2><span id="gEquityLabel">$0.00</span></div>
     <canvas id="globalEquityChart"></canvas>
@@ -140,6 +150,12 @@
 
     <section id="calendarPage" class="page hidden">
       <div class="hero"><div><h1>Trading Calendar</h1><p class="muted">Profit/loss harian dari seluruh akun.</p></div></div>
+      <div class="calendarToolbar">
+        <button id="calPrev" class="secondary">‹</button>
+        <strong id="calTitle">Bulan</strong>
+        <button id="calNext" class="secondary">›</button>
+        <button id="calToday" class="secondary">Hari ini</button>
+      </div>
       <div class="panel"><div id="calendarGrid" class="calendarGrid"></div></div>
     </section>
 
