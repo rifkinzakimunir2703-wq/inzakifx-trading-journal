@@ -223,6 +223,18 @@ function fillTradeAccounts(){const s=$("tAccount");if(!s)return;s.innerHTML='<op
 function fillPayoutAccounts(){
   const s=$("pAccount");if(!s)return;s.innerHTML=accounts.map(a=>`<option value="${a.id}">${esc(a.firm)} — ${esc(a.account_name)}</option>`).join("");
 }
+function getAccountConsistency(accountId){
+  const rows=trades.filter(t=>t.account_id===accountId);
+  const daily={};
+  rows.forEach(t=>{
+    const d=new Date(t.trade_date).toISOString().slice(0,10);
+    daily[d]=(daily[d]||0)+Number(t.pl||0);
+  });
+  const total=Object.values(daily).reduce((s,v)=>s+v,0);
+  const positiveDays=Object.values(daily).filter(v=>v>0);
+  const best=positiveDays.length?Math.max(...positiveDays):0;
+  return total>0 ? (best/total)*100 : 0;
+}
 function renderGlobal(){
   const fees=accounts.reduce((s,a)=>s+Number(a.purchase_fee||0),0);
   const pays=payouts.filter(p=>p.status==="Paid").reduce((s,p)=>s+Number(p.amount||0),0);
@@ -244,7 +256,10 @@ function renderGlobal(){
     list.innerHTML=accounts.map(a=>{
       const st=a.status||"Phase 1", plA=trades.filter(t=>t.account_id===a.id).reduce((s,t)=>s+Number(t.pl||0),0);
       const paid=payouts.filter(p=>p.account_id===a.id&&p.status==="Paid").reduce((s,p)=>s+Number(p.amount||0),0);
-      return `<div class="globalAccountRow"><div><b>${esc(a.firm)} — ${esc(a.account_name)}</b><span class="dashStatus">${esc(st)}</span></div><div><small>P/L ${money(plA)} · Payout ${money(paid)}</small></div></div>`;
+      const currentConsistency=getAccountConsistency(a.id);
+      const rule=Number(a.consistency_pct||0);
+      const consistencyClass=rule>0 ? (currentConsistency<=rule ? "positive" : "negative") : "muted";
+      return `<div class="globalAccountRow"><div><b>${esc(a.firm)} — ${esc(a.account_name)}</b><span class="dashStatus">${esc(st)}</span></div><div class="accountOverviewStats"><small>P/L ${money(plA)} · Payout ${money(paid)}</small><span class="consistencyBadge ${consistencyClass}">Consistency ${currentConsistency.toFixed(1)}%${rule?` / Rule ${rule}%`:""}</span></div></div>`;
     }).join("")||'<p class="muted">Belum ada akun Prop Firm.</p>';
   }
   drawGlobalEquity();
