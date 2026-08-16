@@ -42,29 +42,53 @@
     </nav>
 
     <section id="globalPage" class="page">
-      <div class="hero"><div><div class="eyebrow">WORKSPACE</div><h1>Global Dashboard</h1><p class="muted">Semua akun, biaya, payout, dan performa dalam satu layar.</p></div></div>
-      <div class="cards globalCards">
-        <div class="card"><small>Total Akun</small><strong id="gAccounts">0</strong></div>
-        <div class="card"><small>Total Biaya Akun</small><strong id="gFees">$0.00</strong></div>
-        <div class="card"><small>Total Payout</small><strong id="gPayouts">$0.00</strong></div>
-        <div class="card"><small>Total Trading P/L</small><strong id="gTradingPL">$0.00</strong></div>
-        <div class="card"><small>Net Cash Result</small><strong id="gNet">$0.00</strong></div>
-        <div class="card"><small>Funded</small><strong id="gFunded">0</strong></div>
-        <div class="card"><small>Evaluation</small><strong id="gEval">0</strong></div>
-        <div class="card"><small>Failed</small><strong id="gFailed">0</strong></div>
-      </div>
-      <div class="globalNote">Trading P/L hanya berasal dari hasil trade. Biaya pembelian akun tidak mengurangi Trading P/L. Net Cash Result = Total Payout − Total Biaya Akun.</div>
-      <section class="panel">
-        <div class="sectionTitle"><h2>🏆 Performa Akun</h2><span>ROI</span></div>
-        <div id="globalAccountList"></div>
-      </section>
-      <section class="panel">
-        <div class="sectionTitle"><h2>⚠️ Risk Monitor</h2></div>
-        <div id="riskMonitor"></div>
-      </section>
-    </section>
+  <div class="hero">
+    <div>
+      <div class="eyebrow">WORKSPACE OVERVIEW</div>
+      <h1>Global Dashboard</h1>
+      <p class="muted">Satu ringkasan untuk performa trading, keuangan prop firm, dan kondisi seluruh akun.</p>
+    </div>
+  </div>
 
-    <section id="performancePage" class="page hidden">
+  <section class="dashSection">
+    <div class="dashSectionHead"><div><span class="dashIcon">📈</span><div><h2>Trading Performance</h2><p>Hanya hasil aktivitas trading — tidak dikurangi biaya pembelian akun.</p></div></div><span class="dashTag">TRADING</span></div>
+    <div class="cards globalCards">
+      <div class="card"><small>Total Trading P/L</small><strong id="gTradingPL">$0.00</strong></div>
+      <div class="card"><small>Win Rate</small><strong id="gWinRate">0%</strong></div>
+      <div class="card"><small>Total Trade</small><strong id="gTradeCount">0</strong></div>
+      <div class="card"><small>Profit Factor</small><strong id="gProfitFactor">0.00</strong></div>
+    </div>
+  </section>
+
+  <section class="dashSection">
+    <div class="dashSectionHead"><div><span class="dashIcon">💰</span><div><h2>Prop Firm Finance</h2><p>Arus kas aktual dari pembelian akun dan payout.</p></div></div><span class="dashTag">FINANCE</span></div>
+    <div class="cards globalCards">
+      <div class="card"><small>Total Biaya Akun</small><strong id="gFees">$0.00</strong></div>
+      <div class="card"><small>Total Payout</small><strong id="gPayouts">$0.00</strong></div>
+      <div class="card"><small>Net Cash Result</small><strong id="gNet">$0.00</strong></div>
+      <div class="card"><small>ROI Cash</small><strong id="gCashROI">0%</strong></div>
+    </div>
+    <div class="globalNote">Net Cash Result = Total Payout − Total Biaya Akun. Trading P/L tidak masuk ke rumus ini.</div>
+  </section>
+
+  <section class="dashSection">
+    <div class="dashSectionHead"><div><span class="dashIcon">🏦</span><div><h2>Account Overview</h2><p>Status dan ringkasan seluruh akun prop firm.</p></div></div><span class="dashTag">ACCOUNTS</span></div>
+    <div class="cards globalCards">
+      <div class="card"><small>Total Accounts</small><strong id="gAccounts">0</strong></div>
+      <div class="card"><small>Phase 1</small><strong id="gPhase1">0</strong></div>
+      <div class="card"><small>Phase 2</small><strong id="gPhase2">0</strong></div>
+      <div class="card"><small>Funded</small><strong id="gFunded">0</strong></div>
+    </div>
+    <div id="globalAccountList" class="globalAccountList"></div>
+  </section>
+
+  <section class="panel">
+    <div class="sectionTitle"><h2>📊 Equity Overview</h2><span id="gEquityLabel">$0.00</span></div>
+    <canvas id="globalEquityChart"></canvas>
+  </section>
+</section>
+
+<section id="performancePage" class="page hidden">
   <div class="hero">
     <div><h1>📊 Journal Performance</h1><p class="muted">Analisis keseluruhan semua trade dari seluruh akun.</p></div>
   </div>

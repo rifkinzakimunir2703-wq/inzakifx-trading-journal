@@ -217,14 +217,39 @@ function fillPayoutAccounts(){
 function renderGlobal(){
   const fees=accounts.reduce((s,a)=>s+Number(a.purchase_fee||0),0);
   const pays=payouts.filter(p=>p.status==="Paid").reduce((s,p)=>s+Number(p.amount||0),0);
-  const pl=trades.reduce((s,t)=>s+Number(t.pl||0),0);
-  $("gAccounts").textContent=accounts.length;$("gFees").textContent=money(fees);$("gPayouts").textContent=money(pays);$("gTradingPL").textContent=money(pl);$("gNet").textContent=money(pays+pl-fees);
-  $("gFunded").textContent=accounts.filter(a=>a.status==="Funded"||a.status==="Payout").length;
-  $("gEval").textContent=accounts.filter(a=>a.status==="Phase 1"||a.status==="Phase 2").length;
-  $("gFailed").textContent=accounts.filter(a=>a.status==="Failed").length;
-  const list=$("globalAccountList");if(list)list.innerHTML=accounts.map(a=>{const plA=trades.filter(t=>t.account_id===a.id).reduce((s,t)=>s+Number(t.pl||0),0);const fee=Number(a.purchase_fee||0);const pay=payouts.filter(p=>p.account_id===a.id&&p.status==="Paid").reduce((s,p)=>s+Number(p.amount||0),0);return `<div class="trade"><div><b>${esc(a.firm)} — ${esc(a.account_name)}</b><span class="status">${esc(a.status)}</span></div><small>Trading ${money(plA)} · Payout ${money(pay)} · Fee ${money(fee)} · Net ${money(pay+plA-fee)}</small></div>`}).join("")||'<p class="muted">Belum ada akun.</p>';
-  const risk=$("riskMonitor"); if(risk)risk.innerHTML=accounts.map(a=>{const ts=trades.filter(t=>t.account_id===a.id);const plA=ts.reduce((s,t)=>s+Number(t.pl||0),0);const limit=Number(a.account_size)*Number(a.max_dd_pct)/100;const used=limit?Math.max(0,-plA)/limit*100:0;return `<div class="trade"><div><b>${esc(a.firm)} — ${esc(a.account_name)}</b><b>${used.toFixed(1)}% DD used</b></div><div class="progress"><i style="width:${Math.min(100,used)}%"></i></div></div>`}).join("")||'<p class="muted">Belum ada akun.</p>';
+  const vals=trades.map(t=>Number(t.pl||0));
+  const pl=vals.reduce((s,v)=>s+v,0);
+  const wins=vals.filter(v=>v>0), losses=vals.filter(v=>v<0);
+  const grossW=wins.reduce((s,v)=>s+v,0), grossL=Math.abs(losses.reduce((s,v)=>s+v,0));
+  const wr=vals.length?wins.length/vals.length*100:0, pf=grossL?grossW/grossL:0;
+  const netCash=pays-fees, roi=fees?netCash/fees*100:0;
+  const countStatus=s=>accounts.filter(a=>(a.status||"").toLowerCase().replace(/\s+/g," ")===s).length;
+  [["gTradingPL",money(pl)],["gWinRate",wr.toFixed(1)+"%"],["gTradeCount",vals.length],["gProfitFactor",pf.toFixed(2)],
+   ["gFees",money(-fees)],["gPayouts",money(pays)],["gNet",money(netCash)],["gCashROI",roi.toFixed(1)+"%"],
+   ["gAccounts",accounts.length],["gPhase1",countStatus("phase 1")],["gPhase2",countStatus("phase 2")],["gFunded",countStatus("funded")]]
+  .forEach(([id,v])=>{if($(id))$(id).textContent=v;});
+  ["gTradingPL","gNet"].forEach(id=>{const e=$(id);if(e){e.classList.remove("positive","negative");const n=parseFloat(e.textContent.replace(/[^0-9.-]/g,""));e.classList.add(n>=0?"positive":"negative")}});
+  const list=$("globalAccountList");
+  if(list){
+    list.innerHTML=accounts.map(a=>{
+      const st=a.status||"Phase 1", plA=trades.filter(t=>t.account_id===a.id).reduce((s,t)=>s+Number(t.pl||0),0);
+      const paid=payouts.filter(p=>p.account_id===a.id&&p.status==="Paid").reduce((s,p)=>s+Number(p.amount||0),0);
+      return `<div class="globalAccountRow"><div><b>${esc(a.firm)} — ${esc(a.account_name)}</b><span class="dashStatus">${esc(st)}</span></div><div><small>P/L ${money(plA)} · Payout ${money(paid)}</small></div></div>`;
+    }).join("")||'<p class="muted">Belum ada akun Prop Firm.</p>';
+  }
+  drawGlobalEquity();
 }
+function drawGlobalEquity(){
+  const c=$("globalEquityChart"); if(!c)return;
+  const ts=[...trades].sort((a,b)=>new Date(a.trade_date)-new Date(b.trade_date));
+  const ctx=c.getContext("2d"), w=c.width=c.clientWidth*2, h=c.height=230*2; ctx.clearRect(0,0,w,h);
+  if(!ts.length){if($("gEquityLabel"))$("gEquityLabel").textContent="$0.00";return;}
+  let eq=0;const pts=[0];ts.forEach(t=>{eq+=Number(t.pl||0);pts.push(eq)});
+  if($("gEquityLabel"))$("gEquityLabel").textContent=money(eq);
+  let min=Math.min(...pts),max=Math.max(...pts);if(min===max){min-=1;max+=1}
+  ctx.beginPath();pts.forEach((v,i)=>{const x=i/(pts.length-1)*w,y=h-(v-min)/(max-min)*h;i?ctx.lineTo(x,y):ctx.moveTo(x,y)});ctx.stroke();
+}
+
 function renderCalendar(){
   const box=$("calendarGrid");if(!box)return;
   const now=new Date(), y=now.getFullYear(), m=now.getMonth(), first=new Date(y,m,1).getDay(), days=new Date(y,m+1,0).getDate();
