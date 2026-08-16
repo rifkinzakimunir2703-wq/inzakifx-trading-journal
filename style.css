@@ -16,3 +16,109 @@
 @media(max-width:430px){.filters{grid-template-columns:1fr}}
 
 .navBtn{cursor:pointer;pointer-events:auto;position:relative;z-index:20}.calDay{cursor:pointer;color:inherit;font:inherit;width:100%;text-align:left}.calDay:hover{transform:translateY(-1px);border-color:#4b6578}
+
+
+/* InzakiFX V5 — GitHub-inspired UI */
+:root{
+ --gh-bg:#0d1117;--gh-panel:#161b22;--gh-panel2:#0f141b;--gh-border:#30363d;
+ --gh-text:#e6edf3;--gh-muted:#8b949e;--gh-green:#3fb950;--gh-red:#f85149;
+ --gh-blue:#58a6ff;--gh-purple:#bc8cff;--gh-shadow:0 8px 28px rgba(0,0,0,.22);
+}
+*{box-sizing:border-box}
+html,body{background:var(--gh-bg)!important;color:var(--gh-text)!important}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif!important}
+button,input,select,textarea{font:inherit}
+button{border:1px solid var(--gh-border)!important;border-radius:6px!important;background:#21262d!important;color:var(--gh-text)!important;transition:.15s}
+button:hover{background:#30363d!important;border-color:#8b949e!important}
+button[type=submit],#addTradeBtn,#addAccountBtn,#addPayoutBtn{background:#238636!important;border-color:rgba(240,246,252,.1)!important;color:#fff!important}
+button[type=submit]:hover,#addTradeBtn:hover,#addAccountBtn:hover,#addPayoutBtn:hover{background:#2ea043!important}
+input,select,textarea{background:#0d1117!important;border:1px solid var(--gh-border)!important;color:var(--gh-text)!important;border-radius:6px!important}
+input:focus,select:focus,textarea:focus{outline:2px solid rgba(88,166,255,.35)!important;border-color:var(--gh-blue)!important}
+.panel,.card{background:var(--gh-panel)!important;border:1px solid var(--gh-border)!important;border-radius:6px!important;box-shadow:none!important}
+.card{transition:.15s}.card:hover{border-color:#8b949e!important}
+.hero{border-bottom:1px solid var(--gh-border);padding-bottom:18px;margin-bottom:18px}
+.hero h1{font-weight:600;letter-spacing:-.02em}
+.muted,small{color:var(--gh-muted)!important}
+.mainNav{background:var(--gh-bg)!important;border-bottom:1px solid var(--gh-border);top:0;padding:10px 0!important}
+.navBtn{background:transparent!important;border:1px solid transparent!important;color:var(--gh-muted)!important;border-radius:6px!important}
+.navBtn:hover{background:#161b22!important;color:var(--gh-text)!important}
+.navBtn.active{background:#21262d!important;color:var(--gh-text)!important;border-color:var(--gh-border)!important}
+.status{border:1px solid var(--gh-border);background:#21262d!important;color:var(--gh-text)}
+.positive{color:var(--gh-green)!important}.negative{color:var(--gh-red)!important}
+.progress{background:#21262d!important}.progress i{background:var(--gh-green)!important}
+.trade{border-bottom:1px solid var(--gh-border)!important;padding:12px 0}
+.accountCard{box-shadow:var(--gh-shadow)!important}
+.modal{background:rgba(1,4,9,.72)!important;backdrop-filter:blur(3px)}
+.modalBox{background:var(--gh-panel)!important;border:1px solid var(--gh-border)!important;border-radius:8px!important;box-shadow:0 16px 48px rgba(0,0,0,.45)!important}
+.calDay{background:#161b22!important;border:1px solid var(--gh-border)!important}
+.calDay:hover{border-color:#8b949e!important;transform:translateY(-1px)}
+.calWin{background:rgba(35,134,54,.18)!important;border-color:rgba(63,185,80,.55)!important}
+.calLoss{background:rgba(248,81,73,.12)!important;border-color:rgba(248,81,73,.45)!important}
+.pill{border:1px solid var(--gh-border);background:#21262d;border-radius:999px;padding:2px 7px}
+table{border-color:var(--gh-border)!important}
+a{color:var(--gh-blue)}
+/* contribution-style calendar */
+.calendarGrid{gap:5px!important}.calDay{min-height:68px!important}
+@media(max-width:760px){
+ body{padding-bottom:64px!important}
+ .mainNav{position:fixed!important;left:0;right:0;bottom:0;top:auto!important;z-index:20;background:#161b22!important;border-top:1px solid var(--gh-border)!important;border-bottom:0!important;padding:7px 6px!important;display:flex!important;gap:4px!important;justify-content:space-around!important}
+ .navBtn{font-size:11px!important;padding:8px 6px!important;min-width:0!important;flex:1}
+ .navBtn:nth-child(1)::first-letter{font-size:15px}
+ .hero{padding-top:8px}
+ .cards{gap:10px!important}
+ .card{padding:12px!important}
+}
+
+.ghBrand{display:flex;align-items:center;gap:9px;padding:4px 0 12px;color:var(--gh-text);font-size:18px}
+.ghMark{display:inline-grid;place-items:center;width:26px;height:26px;border:1px solid var(--gh-border);border-radius:6px;background:#21262d;color:var(--gh-text);font-size:12px}
+.ghRepo{font-size:14px;color:var(--gh-muted);padding-left:8px;border-left:1px solid var(--gh-border)}
+.eyebrow{font-size:11px;letter-spacing:.12em;color:var(--gh-muted);margin-bottom:4px}
+@media(max-width:760px){.ghBrand{padding-top:0}.ghRepo{display:none}}
+
+.globalNote{margin:12px 0 0;padding:10px 12px;border:1px solid var(--gh-border);border-radius:6px;color:var(--gh-muted);background:var(--gh-panel2);font-size:13px}
+
+/* InzakiFX V5 — Modern Minimal */
+:root{
+ --bg:#0b0f14;--surface:#11161d;--surface2:#0e1319;--line:#202833;
+ --text:#eef2f6;--muted:#7f8a98;--accent:#35c98b;--accent2:#6aa7ff;
+ --danger:#f06b6b;--radius:10px;
+}
+html,body{background:var(--bg)!important}
+body{max-width:1280px;margin:0 auto;padding:0 24px!important;font-size:14px!important;line-height:1.5!important}
+.ghBrand{height:58px;padding:0!important;border-bottom:1px solid var(--line);margin-bottom:14px}
+.ghMark{width:28px;height:28px;border:0;background:var(--surface);color:var(--accent)}
+.ghBrand strong{font-size:16px;font-weight:650}.ghRepo{font-size:13px;border-left:0!important;padding-left:0!important;color:var(--muted)}
+.mainNav{position:sticky!important;top:0!important;background:rgba(11,15,20,.92)!important;backdrop-filter:blur(12px);border-bottom:1px solid var(--line)!important;padding:7px 0!important;z-index:10}
+.navBtn{font-size:13px!important;padding:8px 11px!important}
+.hero{padding:18px 0!important;border-bottom:1px solid var(--line)!important;margin-bottom:20px!important}
+.hero h1{font-size:25px!important;margin:2px 0 4px!important;font-weight:650!important}
+.panel,.card{border:1px solid var(--line)!important;background:var(--surface)!important;border-radius:var(--radius)!important}
+.panel{padding:18px!important}
+.card{padding:17px!important}
+.card small{font-size:12px!important}.card strong{font-size:24px!important;margin-top:4px;display:block}
+.globalCards,.performanceCards{gap:12px!important}
+.sectionTitle{margin-bottom:12px!important}.sectionTitle h2{font-size:16px!important;font-weight:600!important}
+button{border-radius:7px!important;padding:8px 12px!important}
+input,select,textarea{border-radius:7px!important;padding:9px 11px!important}
+.trade{padding:11px 0!important;border-bottom:1px solid var(--line)!important}
+.accountGrid{gap:12px!important}.accountCard{box-shadow:none!important}
+.status{font-size:11px!important;padding:4px 8px!important}
+.progress{height:5px!important;margin:10px 0!important}
+.globalNote{background:var(--surface2)!important;border-color:var(--line)!important;border-radius:8px!important}
+.calDay{border-color:var(--line)!important;background:var(--surface2)!important;border-radius:7px!important}
+.calDay:hover{transform:none!important;border-color:#46515e!important}
+.modalBox{border-color:var(--line)!important;border-radius:12px!important}
+.twoCol{gap:12px!important}
+.positive{color:var(--accent)!important}.negative{color:var(--danger)!important}
+@media(max-width:760px){
+ body{padding:0 12px 74px!important}
+ .ghBrand{height:52px}
+ .mainNav{left:0!important;right:0!important;margin:0!important;bottom:0!important;top:auto!important;border-top:1px solid var(--line)!important;border-bottom:0!important;padding:6px!important;background:rgba(17,22,29,.97)!important}
+ .navBtn{font-size:10px!important;padding:7px 3px!important}
+ .hero{padding:14px 0!important}
+ .hero h1{font-size:21px!important}
+ .cards{grid-template-columns:repeat(2,1fr)!important}
+ .card strong{font-size:20px!important}
+ .panel{padding:14px!important}
+ .accountMetrics{gap:8px!important}
+}

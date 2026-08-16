@@ -233,30 +233,35 @@ function renderCalendar(){
   for(let d=1;d<=days;d++){const key=new Date(y,m,d).toISOString().slice(0,10);const dayPL=trades.filter(t=>new Date(t.trade_date).toISOString().slice(0,10)===key).reduce((s,t)=>s+Number(t.pl||0),0);h+=`<button type="button" class="calDay ${dayPL>0?"calWin":dayPL<0?"calLoss":""}" data-date="${key}"><b>${d}</b><small>${dayPL?money(dayPL):"—"}</small></button>`}
   box.innerHTML=h;
 }
-document.addEventListener("click", function(e){
+function openPage(pageId){
+  document.querySelectorAll(".page").forEach(p=>p.classList.add("hidden"));
+  document.querySelectorAll(".navBtn").forEach(b=>b.classList.toggle("active", b.dataset.page===pageId));
+  const page=$(pageId);
+  if(page) page.classList.remove("hidden");
+  if(pageId==="globalPage"){renderGlobal();renderAccounts();}
+  if(pageId==="performancePage"){setupPerfFilters();renderPerformance();}
+  if(pageId==="accountsPage"){renderAccounts();}
+  if(pageId==="payoutsPage"){renderPayouts();fillPayoutAccounts();}
+  if(pageId==="calendarPage"){renderCalendar();}
+  if(pageId==="journalPage"){render();}
+  window.scrollTo({top:0,behavior:"smooth"});
+}
+window.openPage=openPage;
+
+document.addEventListener("click",function(e){
+  const nav=e.target.closest(".navBtn");
+  if(nav){e.preventDefault();openPage(nav.dataset.page);return;}
   const day=e.target.closest(".calDay");
   if(day){
+    e.preventDefault();
     const date=day.dataset.date;
-    if($("perfFrom")) $("perfFrom").value=date;
-    if($("perfTo")) $("perfTo").value=date;
-    document.querySelectorAll(".navBtn").forEach(x=>x.classList.toggle("active",x.dataset.page==="performancePage"));
-    document.querySelectorAll(".page").forEach(p=>p.classList.add("hidden"));
-    if($("performancePage")) $("performancePage").classList.remove("hidden");
+    if($("perfFrom"))$("perfFrom").value=date;
+    if($("perfTo"))$("perfTo").value=date;
+    openPage("performancePage");
     renderPerformance();
-    return;
   }
-  const b=e.target.closest(".navBtn");
-  if(!b) return;
-  e.preventDefault();
-  document.querySelectorAll(".navBtn").forEach(x=>x.classList.remove("active"));
-  b.classList.add("active");
-  document.querySelectorAll(".page").forEach(p=>p.classList.add("hidden"));
-  const target=$(b.dataset.page);
-  if(target) target.classList.remove("hidden");
-  if(b.dataset.page==="performancePage") renderPerformance();
-  if(b.dataset.page==="globalPage") { renderGlobal(); renderAccounts(); }
-  if(b.dataset.page==="calendarPage") renderCalendar();
 });
+
 $("addAccountBtn").onclick=()=>show("accountModal",true);$("closeAccountModal").onclick=()=>show("accountModal",false);
 $("addPayoutBtn").onclick=()=>{fillPayoutAccounts();show("payoutModal",true)};$("closePayoutModal").onclick=()=>show("payoutModal",false);
 $("accountForm").onsubmit=async e=>{e.preventDefault();const n=id=>parseFloat($(id).value)||0;const row={user_id:currentUser.id,firm:$("aFirm").value.trim(),account_name:$("aName").value.trim(),account_size:n("aSize"),purchase_fee:n("aFee"),status:$("aStatus").value,target_pct:n("aTarget"),max_dd_pct:n("aMaxDD"),daily_loss_pct:n("aDaily"),consistency_pct:n("aConsistency"),start_date:$("aStart").value||null,notes:$("aNotes").value.trim()};const {error}=await sb.from("prop_accounts").insert(row);if(error){$("accountMsg").textContent=error.message;return}e.target.reset();show("accountModal",false);await loadAccounts();};

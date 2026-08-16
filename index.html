@@ -32,27 +32,28 @@
   </section>
 
   <section id="appView" class="hidden">
-    <nav class="mainNav">
+    <div class="ghBrand"><span class="ghMark">◆</span><strong>InzakiFX</strong><span class="ghRepo">Trading Journal</span></div><nav class="mainNav">
       <button class="navBtn active" data-page="globalPage">🌐 Global Dashboard</button>
-      <button class="navBtn" data-page="performancePage">📊 Journal Performance</button>
-      <button class="navBtn" data-page="accountsPage">🏦 Prop Accounts</button>
-      <button class="navBtn" data-page="payoutsPage">💰 Payouts</button>
-      <button class="navBtn" data-page="calendarPage">📅 Calendar</button>
-      <button class="navBtn" data-page="journalPage">📒 Trading Journal</button>
+      <button type="button" class="navBtn" data-page="performancePage" onclick="openPage(\'performancePage\');return false;">📊 Journal Performance</button>
+      <button type="button" class="navBtn" data-page="accountsPage" onclick="openPage(\'accountsPage\');return false;">🏦 Prop Accounts</button>
+      <button type="button" class="navBtn" data-page="payoutsPage" onclick="openPage(\'payoutsPage\');return false;">💰 Payouts</button>
+      <button type="button" class="navBtn" data-page="calendarPage" onclick="openPage(\'calendarPage\');return false;">📅 Calendar</button>
+      <button type="button" class="navBtn" data-page="journalPage" onclick="openPage(\'journalPage\');return false;">📒 Trading Journal</button>
     </nav>
 
     <section id="globalPage" class="page">
-      <div class="hero"><div><h1>Global Dashboard</h1><p class="muted">Semua akun, biaya, payout, dan performa dalam satu layar.</p></div></div>
+      <div class="hero"><div><div class="eyebrow">WORKSPACE</div><h1>Global Dashboard</h1><p class="muted">Semua akun, biaya, payout, dan performa dalam satu layar.</p></div></div>
       <div class="cards globalCards">
         <div class="card"><small>Total Akun</small><strong id="gAccounts">0</strong></div>
-        <div class="card"><small>Total Biaya Beli</small><strong id="gFees">$0.00</strong></div>
+        <div class="card"><small>Total Biaya Akun</small><strong id="gFees">$0.00</strong></div>
         <div class="card"><small>Total Payout</small><strong id="gPayouts">$0.00</strong></div>
         <div class="card"><small>Total Trading P/L</small><strong id="gTradingPL">$0.00</strong></div>
-        <div class="card"><small>Net Setelah Biaya</small><strong id="gNet">$0.00</strong></div>
+        <div class="card"><small>Net Cash Result</small><strong id="gNet">$0.00</strong></div>
         <div class="card"><small>Funded</small><strong id="gFunded">0</strong></div>
         <div class="card"><small>Evaluation</small><strong id="gEval">0</strong></div>
         <div class="card"><small>Failed</small><strong id="gFailed">0</strong></div>
       </div>
+      <div class="globalNote">Trading P/L hanya berasal dari hasil trade. Biaya pembelian akun tidak mengurangi Trading P/L. Net Cash Result = Total Payout − Total Biaya Akun.</div>
       <section class="panel">
         <div class="sectionTitle"><h2>🏆 Performa Akun</h2><span>ROI</span></div>
         <div id="globalAccountList"></div>
