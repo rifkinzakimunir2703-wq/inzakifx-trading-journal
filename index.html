@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>InzakiFX Trading Journal</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <div class="brand">Inzaki<span>FX</span></div>
+      <div class="subtitle">Trading Journal MVP</div>
+    </div>
+    <div class="actions">
+      <button id="exportBtn" class="secondary">Export CSV</button>
+      <button id="clearBtn" class="danger">Hapus Semua</button>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="hero">
+      <div>
+        <h1>Trading Journal</h1>
+        <p>Catat, evaluasi, dan pantau performa trading kamu.</p>
+      </div>
+      <button id="addTradeTop" class="primary">+ Tambah Trade</button>
+    </section>
+
+    <section class="stats">
+      <div class="card"><span>Total Trade</span><strong id="totalTrades">0</strong></div>
+      <div class="card"><span>Win Rate</span><strong id="winRate">0%</strong></div>
+      <div class="card"><span>Net P/L</span><strong id="netPL">$0.00</strong></div>
+      <div class="card"><span>Profit Factor</span><strong id="profitFactor">0.00</strong></div>
+      <div class="card"><span>Max Drawdown</span><strong id="maxDD">$0.00</strong></div>
+    </section>
+
+    <section class="grid">
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Equity Curve</h2>
+          <span id="equityStart">$0</span>
+        </div>
+        <canvas id="equityChart"></canvas>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Performance</h2>
+        </div>
+        <div id="performance" class="performance"></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Riwayat Trade</h2>
+        <input id="search" class="search" placeholder="Cari symbol / strategi...">
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Tanggal</th><th>Symbol</th><th>Side</th><th>Entry</th><th>Exit</th>
+              <th>Risk</th><th>R:R</th><th>P/L</th><th>Strategi</th><th></th>
+            </tr>
+          </thead>
+          <tbody id="tradeTable"></tbody>
+        </table>
+      </div>
+      <div id="empty" class="empty">Belum ada trade. Tambahkan trade pertama kamu.</div>
+    </section>
+  </main>
+
+  <div id="modal" class="modal hidden">
+    <div class="modal-box">
+      <div class="modal-head">
+        <h2>Tambah Trade</h2>
+        <button id="closeModal" class="icon">×</button>
+      </div>
+      <form id="tradeForm">
+        <div class="form-grid">
+          <label>Tanggal<input type="datetime-local" id="date" required></label>
+          <label>Symbol<input id="symbol" placeholder="XAUUSD / BTCUSDT" required></label>
+          <label>Side
+            <select id="side"><option>BUY</option><option>SELL</option></select>
+          </label>
+          <label>Entry<input type="number" id="entry" step="any" required></label>
+          <label>Exit<input type="number" id="exit" step="any" required></label>
+          <label>Risk ($)<input type="number" id="risk" min="0" step="any" value="10" required></label>
+          <label>P/L ($)<input type="number" id="pl" step="any" required></label>
+          <label>Strategi<input id="strategy" placeholder="FVG BOS"></label>
+          <label>Timeframe<input id="timeframe" placeholder="5M"></label>
+          <label>Session<input id="session" placeholder="London / NY"></label>
+        </div>
+        <label>Catatan<textarea id="notes" placeholder="Kenapa entry? Apa yang bisa diperbaiki?"></textarea></label>
+        <div class="form-actions">
+          <button type="button" id="cancelBtn" class="secondary">Batal</button>
+          <button class="primary" type="submit">Simpan Trade</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
