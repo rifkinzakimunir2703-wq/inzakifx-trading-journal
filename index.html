@@ -7,8 +7,33 @@
   <link rel="stylesheet" href="style.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="config.js"></script>
+
+<style>
+.calendarGrid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+.calHead{text-align:center;font-size:12px;font-weight:700;padding:6px}
+.calEmpty{min-height:58px}
+.calDay{min-height:58px;border:1px solid #30363d;border-radius:10px;background:#161b22;color:inherit;padding:6px;cursor:pointer}
+.calDay b,.calDay small{display:block}
+.calDay small{margin-top:5px;font-size:11px}
+.calWin{border-color:#3fb950}
+.calLoss{border-color:#f85149}
+.calToday{outline:2px solid #58a6ff}
+@media(max-width:600px){.calDay{min-height:50px;padding:4px}.calHead{font-size:10px}}
+</style>
+
 </head>
 <body>
+<div id="indicatorLinks" style="position:fixed;left:14px;top:14px;z-index:9998;display:flex;gap:8px;flex-wrap:wrap">
+  <a href="https://lynk.id/inzakifx" target="_blank" rel="noopener noreferrer"
+     style="padding:9px 13px;border-radius:10px;border:1px solid #30363d;background:#161b22;color:#fff;text-decoration:none;font-weight:600">
+    🛒 Beli INDICATOR
+  </a>
+  <a href="https://discord.gg/PTMNaDqbj" target="_blank" rel="noopener noreferrer"
+     style="padding:9px 13px;border-radius:10px;border:1px solid #30363d;background:#161b22;color:#fff;text-decoration:none;font-weight:600">
+    💬 Discord Group
+  </a>
+</div>
+
 <button id="adminLoginBtn" type="button" onclick="showAdminLogin()" style="position:fixed;right:14px;top:14px;z-index:9999;padding:9px 13px;border-radius:10px;border:1px solid #30363d;background:#161b22;color:#fff;cursor:pointer">🔐 Admin Login</button>
 
 <header class="topbar">
@@ -271,6 +296,31 @@ function showAdminLogin(){
   const btn = document.getElementById("adminLoginBtn");
   if(btn) btn.style.display = "none";
 }
+</script>
+
+
+<script>
+(function(){
+  function setPublicNav(isAdmin){
+    const allowed = ["performancePage","journalPage"];
+    document.querySelectorAll(".navBtn").forEach(btn=>{
+      const page = btn.dataset.page;
+      btn.classList.toggle("hidden", !isAdmin && !allowed.includes(page));
+    });
+    if(!isAdmin){
+      document.querySelectorAll(".page").forEach(page=>{
+        if(!allowed.includes(page.id)) page.classList.add("hidden");
+      });
+      const journal = document.getElementById("journalPage");
+      const perf = document.getElementById("performancePage");
+      if(journal && perf && journal.classList.contains("hidden") && perf.classList.contains("hidden")){
+        journal.classList.remove("hidden");
+      }
+    }
+  }
+  window.setPublicNav = setPublicNav;
+  window.addEventListener("DOMContentLoaded", ()=>setPublicNav(true));
+})();
 </script>
 
 </body>
