@@ -9,13 +9,15 @@
   <script src="config.js"></script>
 </head>
 <body>
+<button id="adminLoginBtn" type="button" onclick="showAdminLogin()" style="position:fixed;right:14px;top:14px;z-index:9999;padding:9px 13px;border-radius:10px;border:1px solid #30363d;background:#161b22;color:#fff;cursor:pointer">🔐 Admin Login</button>
+
 <header class="topbar">
   <div><b>INZAKI</b><small>Trading Journal</small></div>
   <button id="logoutBtn" class="secondary hidden">Logout</button>
 </header>
 
 <main class="container">
-  <section id="authView" class="panel auth">
+  <section id="authView" class="panel auth hidden">
     <h1>INZAKI Journal</h1>
     <p class="muted">Simpan jurnal trading kamu secara online.</p>
     <div class="tabs">
@@ -31,7 +33,7 @@
     <p id="authMsg" class="msg"></p>
   </section>
 
-  <section id="appView" class="hidden">
+  <section id="appView">
     <div class="ghBrand"><span class="ghMark">◆</span><strong>INZAKI</strong><span class="ghRepo">Trading Journal</span></div><nav class="mainNav">
       <button class="navBtn active" data-page="globalPage">🌐 Global Dashboard</button>
       <button type="button" class="navBtn" data-page="performancePage" onclick="openPage(\'performancePage\');return false;">📊 Journal Performance</button>
@@ -259,5 +261,17 @@
 </div>
 
 <script src="app.js"></script>
+
+<script>
+function showAdminLogin(){
+  const auth = document.getElementById("authView");
+  const app = document.getElementById("appView");
+  if(auth) auth.classList.remove("hidden");
+  if(app) app.classList.add("hidden");
+  const btn = document.getElementById("adminLoginBtn");
+  if(btn) btn.style.display = "none";
+}
+</script>
+
 </body>
 </html>
