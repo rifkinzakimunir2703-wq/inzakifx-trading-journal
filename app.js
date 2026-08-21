@@ -1,854 +1,555 @@
+/* =========================================================
+   INZAKI TRADING JOURNAL
+   ADMIN LOGIN + PUBLIC VIEW ONLY
+   ========================================================= */
+
+const $ = id => document.getElementById(id);
+
 const sb = window.supabase.createClient(
   SUPABASE_URL,
   SUPABASE_PUBLISHABLE_KEY
 );
 
 let currentUser = null;
+let publicOwnerId = null;
+
 let trades = [];
-let authMode = "login";
 let accounts = [];
 let payouts = [];
 
 let prop = {
-  account:5000,
-  targetPct:6,
-  maxDDPct:4,
-  dailyLossPct:2,
-  consistencyPct:20,
-  buffer:100
+  account: 5000,
+  targetPct: 6,
+  maxDDPct: 4,
+  dailyLossPct: 2,
+  consistencyPct: 20,
+  buffer: 100
 };
 
+let authMode = "login";
 let editingAccountId = null;
 let calendarCursor = new Date();
 
-const $ = id => document.getElementById(id);
+const money = n => {
+  const v = Number(n) || 0;
+  return `${v < 0 ? "-" : ""}$${Math.abs(v).toFixed(2)}`;
+};
 
-const money = n =>
-  `${n < 0 ? "-" : ""}$${Math.abs(Number(n)||0).toFixed(2)}`;
+const esc = v =>
+  String(v ?? "").replace(/[&<>"']/g, m => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;"
+  }[m]));
 
-function setValueClass(id,value,mode="normal"){
+function show(id, yes = true) {
+  const el = $(id);
+  if (el) el.classList.toggle("hidden", !yes);
+}
 
-  const el=$(id);
+function num(id) {
+  const el = $(id);
+  if (!el) return 0;
 
-  if(!el)return;
+  const n = parseFloat(el.value);
+  return Number.isFinite(n) ? n : 0;
+}
 
-  el.classList.remove(
-    "positive",
-    "negative",
-    "neutralValue"
-  );
+function setValueClass(id, value, mode = "normal") {
+  const el = $(id);
+  if (!el) return;
 
-  if(mode==="winrate"){
+  el.classList.remove("positive", "negative", "neutralValue");
 
-    el.classList.add(
-      Number(value)>=50
-        ?"positive"
-        :"negative"
-    );
-
-  }else if(Number(value)>0){
-
+  if (mode === "winrate") {
+    el.classList.add(Number(value) >= 50 ? "positive" : "negative");
+  } else if (Number(value) > 0) {
     el.classList.add("positive");
-
-  }else if(Number(value)<0){
-
+  } else if (Number(value) < 0) {
     el.classList.add("negative");
-
-  }else{
-
+  } else {
     el.classList.add("neutralValue");
-
-  }
-}
-
-function show(id,yes=true){
-
-  const el=$(id);
-
-  if(el){
-    el.classList.toggle(
-      "hidden",
-      !yes
-    );
   }
 }
 
 /* =========================================================
-   ADMIN LOGIN BUTTON
-========================================================= */
+   MODE / AUTH UI
+   ========================================================= */
 
-function createAdminLoginButton(){
-
-  let btn=$("adminLoginBtn");
-
-  if(!btn){
-
-    btn=document.createElement("button");
-
-    btn.id="adminLoginBtn";
-    btn.className="secondary";
-    btn.textContent="🔐 Admin Login";
-
-    const topbar=
-      document.querySelector(".topbar");
-
-    if(topbar){
-
-      topbar.appendChild(btn);
-
-    }
-
-  }
-
-  btn.onclick=()=>{
-
-    showAdminLogin();
-
-  };
-
-  return btn;
+function isAdmin() {
+  return !!currentUser;
 }
 
-function showAdminLogin(){
+function setPublicNav(admin) {
 
-  setAuthMode("login");
+  /*
+    PUBLIK HANYA:
+    - Trading Journal
+    - Journal Performance
+    - Calendar
 
-  show("appView",false);
+    ADMIN:
+    - Semua halaman
+  */
 
-  show("authView",true);
-
-  show("logoutBtn",false);
-
-  const btn=
-    createAdminLoginButton();
-
-  btn.classList.add("hidden");
-
-}
-
-function closeAdminLogin(){
-
-  show("authView",false);
-
-  show("appView",true);
-
-  const btn=
-    createAdminLoginButton();
-
-  btn.classList.remove("hidden");
-
-  setViewOnlyMode();
-
-  openPage("journalPage");
-
-}
-
-/* =========================================================
-   INIT
-========================================================= */
-
-async function init(){
-
-  createAdminLoginButton();
-
-  if(
-    !SUPABASE_PUBLISHABLE_KEY ||
-    SUPABASE_PUBLISHABLE_KEY.includes("PASTE_")
-  ){
-
-    console.error(
-      "Supabase Publishable Key belum diatur."
-    );
-
-    return;
-
-  }
-
-  const {
-    data:{
-      session
-    }
-  } =
-    await sb.auth.getSession();
-
-  if(session){
-
-    await enterApp(
-      session.user
-    );
-
-  }else{
-
-    await enterViewOnly();
-
-  }
-
-  sb.auth.onAuthStateChange(
-    async(
-      _event,
-      session
-    )=>{
-
-      if(session){
-
-        await enterApp(
-          session.user
-        );
-
-      }else{
-
-        await enterViewOnly();
-
-      }
-
-    }
-  );
-}
-
-/* =========================================================
-   ADMIN MODE
-========================================================= */
-
-async function enterApp(user){
-
-  currentUser=user;
-
-  show(
-    "authView",
-    false
-  );
-
-  show(
-    "appView",
-    true
-  );
-
-  show(
-    "logoutBtn",
-    true
-  );
-
-  const adminBtn=
-    createAdminLoginButton();
-
-  adminBtn.classList.add(
-    "hidden"
-  );
-
-  setAdminMode();
-
-  await loadTrades();
-
-  await loadProp();
-
-  await loadAccounts();
-
-  await loadPayouts();
-
-  openPage(
-    "journalPage"
-  );
-}
-
-/* =========================================================
-   VIEW ONLY MODE
-========================================================= */
-
-async function enterViewOnly(){
-
-  currentUser=null;
-
-  show(
-    "authView",
-    false
-  );
-
-  show(
-    "appView",
-    true
-  );
-
-  show(
-    "logoutBtn",
-    false
-  );
-
-  const adminBtn=
-    createAdminLoginButton();
-
-  adminBtn.classList.remove(
-    "hidden"
-  );
-
-  setViewOnlyMode();
-
-  await loadPublicTrades();
-
-  openPage(
-    "journalPage"
-  );
-}
-
-/* =========================================================
-   VIEW ONLY NAVIGATION
-========================================================= */
-
-function setViewOnlyMode(){
-
-  const allowedPages=[
+  const publicPages = new Set([
     "journalPage",
     "performancePage",
     "calendarPage"
-  ];
+  ]);
 
-  document
-    .querySelectorAll(".navBtn")
-    .forEach(btn=>{
+  document.querySelectorAll(".navBtn").forEach(btn => {
 
-      const page=
-        btn.dataset.page;
+    const page = btn.dataset.page;
 
-      btn.style.display=
-        allowedPages.includes(page)
-          ?""
-          :"none";
-
-    });
-
-  [
-    "addTradeBtn",
-    "exportBtn",
-    "modeBtn",
-    "addAccountBtn",
-    "addPayoutBtn",
-    "savePropBtn"
-  ].forEach(id=>{
-
-    const el=$(id);
-
-    if(el){
-
-      el.classList.add(
-        "hidden"
-      );
-
-    }
+    btn.style.display =
+      admin || publicPages.has(page)
+        ? ""
+        : "none";
 
   });
 
-  document
-    .querySelectorAll(
-      ".admin-only"
-    )
-    .forEach(el=>{
-
-      el.classList.add(
-        "hidden"
-      );
-
-    });
+  if (!admin) {
+    openPage("journalPage");
+  }
 }
 
-/* =========================================================
-   ADMIN NAVIGATION
-========================================================= */
+function setPublicControls(admin) {
 
-function setAdminMode(){
-
-  document
-    .querySelectorAll(".navBtn")
-    .forEach(btn=>{
-
-      btn.style.display="";
-
-    });
-
-  [
+  const adminControls = [
     "addTradeBtn",
-    "exportBtn",
-    "modeBtn",
     "addAccountBtn",
     "addPayoutBtn",
-    "savePropBtn"
-  ].forEach(id=>{
+    "savePropBtn",
+    "exportBtn",
+    "modeBtn"
+  ];
 
-    const el=$(id);
+  adminControls.forEach(id => {
 
-    if(el){
+    const el = $(id);
 
-      el.classList.remove(
-        "hidden"
-      );
-
+    if (el) {
+      el.classList.toggle("hidden", !admin);
     }
 
   });
 
-  document
-    .querySelectorAll(
-      ".admin-only"
-    )
-    .forEach(el=>{
+  /*
+    Semua elemen admin-only
+    disembunyikan untuk publik.
+  */
 
-      el.classList.remove(
-        "hidden"
-      );
+  document.querySelectorAll(".admin-only").forEach(el => {
+    el.classList.toggle("hidden", !admin);
+  });
+}
 
-    });
+function setModeBadge(admin) {
+
+  const badge = $("viewModeBadge");
+
+  if (!badge) return;
+
+  if (admin) {
+    badge.textContent = "🟢 ADMIN MODE";
+  } else {
+    badge.textContent = "👁 VIEW ONLY";
+  }
+}
+
+function getLoginButton() {
+  return $("loginBtn") || $("adminLoginBtn");
+}
+
+function showAdminLogin() {
+
+  show("appView", false);
+  show("authView", true);
+  show("logoutBtn", false);
+
+  const loginBtn = getLoginButton();
+
+  if (loginBtn) {
+    loginBtn.style.display = "none";
+  }
+
+  const registerTab = $("registerTab");
+
+  /*
+    Register sengaja dimatikan.
+    Hanya Admin yang dibuat dari
+    Supabase Authentication.
+  */
+
+  if (registerTab) {
+    registerTab.style.display = "none";
+  }
+
+  if ($("loginTab")) {
+    $("loginTab").style.display = "";
+  }
+
+  if ($("authSubmit")) {
+    $("authSubmit").textContent = "Login Admin";
+  }
+
+  if ($("authMsg")) {
+    $("authMsg").textContent = "";
+  }
+}
+
+function enterPublicUI() {
+
+  currentUser = null;
+
+  show("authView", false);
+  show("appView", true);
+  show("logoutBtn", false);
+
+  const loginBtn = getLoginButton();
+
+  if (loginBtn) {
+    loginBtn.style.display = "";
+  }
+
+  setPublicNav(false);
+  setPublicControls(false);
+  setModeBadge(false);
+}
+
+async function enterAdminUI(user) {
+
+  currentUser = user;
+
+  show("authView", false);
+  show("appView", true);
+  show("logoutBtn", true);
+
+  const loginBtn = getLoginButton();
+
+  if (loginBtn) {
+    loginBtn.style.display = "none";
+  }
+
+  setPublicNav(true);
+  setPublicControls(true);
+  setModeBadge(true);
+
+  await loadAdminData();
 }
 
 /* =========================================================
    AUTH
-========================================================= */
+   ========================================================= */
 
-const loginTab=$("loginTab");
+function setupAuth() {
 
-if(loginTab){
+  const loginBtn = getLoginButton();
 
-  loginTab.onclick=()=>{
-    setAuthMode("login");
-  };
-
-}
-
-const registerTab=$("registerTab");
-
-if(registerTab){
-
-  registerTab.onclick=()=>{
-    setAuthMode("register");
-  };
-
-}
-
-function setAuthMode(mode){
-
-  authMode=mode;
-
-  if($("loginTab")){
-
-    $("loginTab")
-      .classList
-      .toggle(
-        "active",
-        mode==="login"
-      );
-
+  if (loginBtn) {
+    loginBtn.onclick = showAdminLogin;
   }
 
-  if($("registerTab")){
-
-    $("registerTab")
-      .classList
-      .toggle(
-        "active",
-        mode==="register"
-      );
-
+  if ($("registerTab")) {
+    $("registerTab").style.display = "none";
   }
 
-  document
-    .querySelectorAll(
-      ".registerOnly"
-    )
-    .forEach(e=>{
+  if ($("loginTab")) {
+    $("loginTab").onclick = () => {
+      authMode = "login";
 
-      e.classList.toggle(
-        "hidden",
-        mode!=="register"
-      );
+      $("loginTab").classList.add("active");
 
-    });
+      if ($("registerTab")) {
+        $("registerTab").classList.remove("active");
+      }
 
-  if($("authSubmit")){
+      document.querySelectorAll(".registerOnly")
+        .forEach(el => el.classList.add("hidden"));
 
-    $("authSubmit")
-      .textContent=
-        mode==="login"
-          ?"Login"
-          :"Register";
+      if ($("authSubmit")) {
+        $("authSubmit").textContent = "Login Admin";
+      }
 
+      if ($("authMsg")) {
+        $("authMsg").textContent = "";
+      }
+    };
   }
 
-  if($("authMsg")){
+  if ($("authForm")) {
 
-    $("authMsg")
-      .textContent="";
-
-  }
-}
-
-const authForm=
-  $("authForm");
-
-if(authForm){
-
-  authForm.onsubmit=
-    async e=>{
+    $("authForm").onsubmit = async e => {
 
       e.preventDefault();
 
-      if($("authMsg")){
+      if (!$("authMsg")) return;
 
-        $("authMsg")
-          .textContent=
-            "Memproses...";
+      $("authMsg").textContent = "Login...";
 
+      const email = $("email")?.value.trim();
+      const password = $("password")?.value;
+
+      if (!email || !password) {
+        $("authMsg").textContent =
+          "Email dan password wajib diisi.";
+
+        return;
       }
 
-      const email=
-        $("email")
-          .value
-          .trim();
+      const { error } =
+        await sb.auth.signInWithPassword({
+          email,
+          password
+        });
 
-      const password=
-        $("password")
-          .value;
+      if (error) {
 
-      let result;
+        $("authMsg").textContent =
+          "Login gagal: " + error.message;
 
-      if(
-        authMode==="login"
-      ){
-
-        result=
-          await sb.auth
-            .signInWithPassword({
-              email,
-              password
-            });
-
-      }else{
-
-        result=
-          await sb.auth
-            .signUp({
-
-              email,
-              password,
-
-              options:{
-                data:{
-                  display_name:
-                    $("displayName")
-                      ?.value
-                      ?.trim() || ""
-                }
-              }
-
-            });
-
+        return;
       }
 
-      if(result.error){
-
-        if($("authMsg")){
-
-          $("authMsg")
-            .textContent=
-              result.error.message;
-
-        }
-
-      }else if(
-        authMode==="register"
-      ){
-
-        if($("authMsg")){
-
-          $("authMsg")
-            .textContent=
-              "Registrasi berhasil. Jika email confirmation aktif, cek email lalu login.";
-
-        }
-
-      }
+      $("authMsg").textContent =
+        "Login berhasil.";
 
     };
+  }
 
-}
+  if ($("logoutBtn")) {
 
-/* =========================================================
-   LOGOUT
-========================================================= */
-
-const logoutBtn=
-  $("logoutBtn");
-
-if(logoutBtn){
-
-  logoutBtn.onclick=
-    async()=>{
+    $("logoutBtn").onclick = async () => {
 
       await sb.auth.signOut();
 
     };
 
+  }
 }
 
 /* =========================================================
-   PUBLIC TRADES
-========================================================= */
+   PUBLIC OWNER
+   ========================================================= */
 
-async function loadPublicTrades(){
+async function getPublicOwnerId() {
 
-  const {
-    data,
-    error
-  } =
-    await sb
-      .from("trades")
-      .select("*")
-      .order(
-        "trade_date",
-        {
-          ascending:true
-        }
-      );
+  const { data, error } =
+    await sb.rpc("get_public_portal_owner_id");
 
-  if(error){
+  if (error) {
 
     console.error(
-      "Public trade error:",
+      "Gagal mengambil public owner:",
       error
     );
 
-    trades=[];
-
-  }else{
-
-    trades=
-      data || [];
-
+    return null;
   }
 
-  accounts=[];
-  payouts=[];
-
-  render();
-
-  renderCalendar();
-
-  setupPerfFilters();
-
-  renderPerformance();
+  return data || null;
 }
 
 /* =========================================================
-   ADD TRADE
-========================================================= */
+   PUBLIC DATA
+   ========================================================= */
 
-const addTradeBtn=
-  $("addTradeBtn");
+async function loadPublicData() {
 
-if(addTradeBtn){
+  publicOwnerId = await getPublicOwnerId();
 
-  addTradeBtn.onclick=()=>{
+  if (!publicOwnerId) {
 
-    if(!currentUser){
-
-      showAdminLogin();
-
-      return;
-
-    }
-
-    show(
-      "modal",
-      true
+    console.error(
+      "Public owner belum dikonfigurasi."
     );
 
-  };
+    trades = [];
+    accounts = [];
+    payouts = [];
 
+    renderAll();
+
+    return;
+  }
+
+  const [
+    tradesResult,
+    accountsResult,
+    payoutsResult
+  ] = await Promise.all([
+
+    sb
+      .from("trades")
+      .select("*")
+      .eq("user_id", publicOwnerId)
+      .order("trade_date", {
+        ascending: true
+      }),
+
+    sb
+      .from("prop_accounts")
+      .select("*")
+      .eq("user_id", publicOwnerId)
+      .order("created_at", {
+        ascending: false
+      }),
+
+    sb
+      .from("payouts")
+      .select("*")
+      .eq("user_id", publicOwnerId)
+      .order("payout_date", {
+        ascending: false
+      })
+
+  ]);
+
+  if (tradesResult.error) {
+    console.error(
+      "Public trades:",
+      tradesResult.error
+    );
+  }
+
+  if (accountsResult.error) {
+    console.error(
+      "Public accounts:",
+      accountsResult.error
+    );
+  }
+
+  if (payoutsResult.error) {
+    console.error(
+      "Public payouts:",
+      payoutsResult.error
+    );
+  }
+
+  trades = tradesResult.data || [];
+  accounts = accountsResult.data || [];
+  payouts = payoutsResult.data || [];
+
+  renderAll();
 }
 
-if($("closeModal")){
+async function loadAdminData() {
 
-  $("closeModal").onclick=()=>{
+  if (!currentUser) return;
 
-    show(
-      "modal",
-      false
-    );
+  await Promise.all([
+    loadTrades(),
+    loadAccounts(),
+    loadPayouts(),
+    loadProp()
+  ]);
 
-  };
-
+  renderAll();
 }
 
 /* =========================================================
-   TRADE FORM
-========================================================= */
+   TRADES
+   ========================================================= */
 
-if($("tradeForm")){
+async function loadTrades() {
 
-  $("tradeForm").onsubmit=
-    async e=>{
+  if (!currentUser) return;
 
-      e.preventDefault();
+  const { data, error } =
+    await sb
+      .from("trades")
+      .select("*")
+      .eq("user_id", currentUser.id)
+      .order("trade_date", {
+        ascending: true
+      });
 
-      if(!currentUser){
+  if (error) {
 
-        showAdminLogin();
-
-        return;
-
-      }
-
-      $("tradeMsg")
-        .textContent=
-          "Menyimpan...";
-
-      const row={
-
-        user_id:
-          currentUser.id,
-
-        account_id:
-          $("tAccount")
-            ?$("tAccount")
-              .value || null
-            :null,
-
-        trade_date:
-          new Date()
-            .toISOString(),
-
-        symbol:
-          $("tSymbol")
-            .value
-            .trim()
-            .toUpperCase(),
-
-        side:
-          $("tSide")
-            .value,
-
-        entry:
-          num("tEntry"),
-
-        exit:
-          num("tExit"),
-
-        risk:
-          num("tRisk"),
-
-        pl:
-          num("tPL"),
-
-        strategy:
-          $("tStrategy")
-            .value
-            .trim(),
-
-        timeframe:
-          $("tTF")
-            .value
-            .trim(),
-
-        session:
-          $("tSession")
-            .value
-            .trim(),
-
-        notes:
-          $("tNotes")
-            .value
-            .trim()
-
-      };
-
-      const {
-        error
-      } =
-        await sb
-          .from("trades")
-          .insert(row);
-
-      if(error){
-
-        $("tradeMsg")
-          .textContent=
-            error.message;
-
-        return;
-
-      }
-
-      $("tradeForm")
-        .reset();
-
-      $("tradeMsg")
-        .textContent=
-          "Trade tersimpan.";
-
-      setTimeout(
-        ()=>{
-          show(
-            "modal",
-            false
-          );
-        },
-        500
-      );
-
-      await loadTrades();
-
-      await loadProp();
-
-      await loadAccounts();
-
-      await loadPayouts();
-
-    };
-
-}
-
-function num(id){
-
-  const el=$(id);
-
-  if(!el)return 0;
-
-  const v=
-    parseFloat(
-      el.value
+    console.error(
+      "Load trades:",
+      error
     );
 
-  return Number.isFinite(v)
-    ?v
-    :0;
+    return;
+  }
+
+  trades = data || [];
+}
+
+async function loadAccounts() {
+
+  if (!currentUser) return;
+
+  const { data, error } =
+    await sb
+      .from("prop_accounts")
+      .select("*")
+      .eq("user_id", currentUser.id)
+      .order("created_at", {
+        ascending: false
+      });
+
+  if (error) {
+
+    console.error(
+      "Load accounts:",
+      error
+    );
+
+    return;
+  }
+
+  accounts = data || [];
+}
+
+async function loadPayouts() {
+
+  if (!currentUser) return;
+
+  const { data, error } =
+    await sb
+      .from("payouts")
+      .select("*")
+      .eq("user_id", currentUser.id)
+      .order("payout_date", {
+        ascending: false
+      });
+
+  if (error) {
+
+    console.error(
+      "Load payouts:",
+      error
+    );
+
+    return;
+  }
+
+  payouts = data || [];
 }
 
 /* =========================================================
-   PROP FIRM
-========================================================= */
+   PROP SETTINGS
+   ========================================================= */
 
-async function loadProp(){
+async function loadProp() {
 
-  if(!currentUser)return;
+  if (!currentUser) return;
 
-  const {
-    data,
-    error
-  } =
+  const { data, error } =
     await sb
       .from("profiles")
-      .select(
-        "prop_settings"
-      )
-      .eq(
-        "id",
-        currentUser.id
-      )
+      .select("prop_settings")
+      .eq("id", currentUser.id)
       .maybeSingle();
 
-  if(
-    !error &&
-    data &&
-    data.prop_settings
-  ){
+  if (!error && data?.prop_settings) {
 
-    prop={
+    prop = {
       ...prop,
       ...data.prop_settings
     };
@@ -856,98 +557,64 @@ async function loadProp(){
   }
 
   setPropInputs();
-
   renderProp();
 }
 
-function setPropInputs(){
+function setPropInputs() {
 
-  const map={
-    propAccount:"account",
-    propTargetPct:"targetPct",
-    propMaxDDPct:"maxDDPct",
-    propDailyLossPct:"dailyLossPct",
-    propConsistencyPct:"consistencyPct",
-    propBuffer:"buffer"
+  const map = {
+    propAccount: "account",
+    propTargetPct: "targetPct",
+    propMaxDDPct: "maxDDPct",
+    propDailyLossPct: "dailyLossPct",
+    propConsistencyPct: "consistencyPct",
+    propBuffer: "buffer"
   };
 
-  Object
-    .entries(map)
-    .forEach(
-      ([id,key])=>{
+  Object.entries(map).forEach(([id, key]) => {
 
-        if($(id)){
+    if ($(id)) {
+      $(id).value = prop[key];
+    }
 
-          $(id).value=
-            prop[key];
-
-        }
-
-      }
-    );
+  });
 }
 
-async function saveProp(){
+async function saveProp() {
 
-  if(!currentUser){
-
+  if (!currentUser) {
     showAdminLogin();
-
     return;
-
   }
 
-  const n=
-    id=>
-      parseFloat(
-        $(id).value
-      ) || 0;
+  const n = id =>
+    parseFloat($(id)?.value) || 0;
 
-  prop={
-
-    account:
-      n("propAccount"),
-
-    targetPct:
-      n("propTargetPct"),
-
-    maxDDPct:
-      n("propMaxDDPct"),
-
-    dailyLossPct:
-      n("propDailyLossPct"),
-
-    consistencyPct:
-      n("propConsistencyPct"),
-
-    buffer:
-      n("propBuffer")
-
+  prop = {
+    account: n("propAccount"),
+    targetPct: n("propTargetPct"),
+    maxDDPct: n("propMaxDDPct"),
+    dailyLossPct: n("propDailyLossPct"),
+    consistencyPct: n("propConsistencyPct"),
+    buffer: n("propBuffer")
   };
 
-  const {
-    error
-  } =
+  const { error } =
     await sb
       .from("profiles")
       .update({
-        prop_settings:
-          prop
+        prop_settings: prop
       })
-      .eq(
-        "id",
-        currentUser.id
-      );
+      .eq("id", currentUser.id);
 
-  if(error){
+  if (error) {
 
     alert(
-      "Gagal menyimpan pengaturan: "+
+      "Gagal menyimpan pengaturan: " +
       error.message
     );
 
     return;
-
   }
 
   renderProp();
@@ -957,663 +624,2087 @@ async function saveProp(){
   );
 }
 
-function renderProp(){
+function renderProp() {
 
-  if(!$("propTarget"))return;
+  if (!$("propTarget")) return;
 
-  const net=
+  const net =
     trades.reduce(
-      (a,t)=>
-        a+
-        Number(t.pl||0),
+      (a, t) => a + Number(t.pl || 0),
       0
     );
 
-  const target=
-    prop.account*
-    prop.targetPct/
+  const target =
+    prop.account *
+    prop.targetPct /
     100;
 
-  const ddLimit=
-    prop.account*
-    prop.maxDDPct/
+  const ddLimit =
+    prop.account *
+    prop.maxDDPct /
     100;
 
-  const dailyLimit=
-    prop.account*
-    prop.dailyLossPct/
+  const dailyLimit =
+    prop.account *
+    prop.dailyLossPct /
     100;
 
-  const days={};
+  const days = {};
 
-  trades.forEach(t=>{
+  trades.forEach(t => {
 
-    const d=
-      new Date(
-        t.trade_date
-      )
-      .toISOString()
-      .slice(0,10);
+    const d =
+      new Date(t.trade_date)
+        .toISOString()
+        .slice(0, 10);
 
-    days[d]=
-      (days[d]||0)+
-      Number(t.pl||0);
+    days[d] =
+      (days[d] || 0) +
+      Number(t.pl || 0);
 
   });
 
-  const vals=
-    Object.values(days);
+  const vals = Object.values(days);
 
-  const best=
-    Math.max(
-      0,
-      ...vals
-    );
+  const best =
+    Math.max(0, ...vals);
 
-  const consistency=
-    net>0
-      ?best/net*100
-      :0;
+  const consistency =
+    net > 0
+      ? best / net * 100
+      : 0;
 
-  const progress=
-    target>0
-      ?Math.max(
-        0,
-        Math.min(
-          100,
-          net/target*100
+  const progress =
+    target > 0
+      ? Math.max(
+          0,
+          Math.min(
+            100,
+            net / target * 100
+          )
         )
-      )
-      :0;
+      : 0;
 
-  $("propTarget")
-    .textContent=
+  if ($("propTarget"))
+    $("propTarget").textContent =
       money(target);
 
-  $("propProgress")
-    .textContent=
-      progress.toFixed(1)+"%";
+  if ($("propProgress"))
+    $("propProgress").textContent =
+      progress.toFixed(1) + "%";
 
-  $("propDDLimit")
-    .textContent=
+  if ($("propDDLimit"))
+    $("propDDLimit").textContent =
       money(ddLimit);
 
-  $("propDailyLimit")
-    .textContent=
+  if ($("propDailyLimit"))
+    $("propDailyLimit").textContent =
       money(dailyLimit);
 
-  $("propBestDay")
-    .textContent=
+  if ($("propBestDay"))
+    $("propBestDay").textContent =
       money(best);
 
-  $("propConsistency")
-    .textContent=
-      consistency.toFixed(1)+"%";
+  if ($("propConsistency"))
+    $("propConsistency").textContent =
+      consistency.toFixed(1) + "%";
 
-  let warn="";
+  let warn = "";
 
-  if(net<=-ddLimit){
+  if (net <= -ddLimit) {
 
-    warn=
+    warn =
       "⛔ Max drawdown terlampaui.";
 
-  }else if(
-    vals.some(
-      v=>v<=-dailyLimit
-    )
-  ){
+  } else if (
+    vals.some(v => v <= -dailyLimit)
+  ) {
 
-    warn=
+    warn =
       "⛔ Daily loss limit terlampaui.";
 
-  }else if(
-    consistency>
-    prop.consistencyPct
-  ){
+  } else if (
+    consistency > prop.consistencyPct
+  ) {
 
-    warn=
-      "⚠️ Consistency di atas batas. Sebarkan profit ke beberapa hari.";
+    warn =
+      "⚠️ Consistency di atas batas.";
 
-  }else if(
-    net>=target
-  ){
+  } else if (net >= target) {
 
-    warn=
+    warn =
       "✅ Target profit tercapai.";
 
-  }else{
+  } else {
 
-    warn=
-      "🟢 Masih dalam batas. Sisa target: "+
-      money(
-        Math.max(
-          0,
-          target-net
-        )
-      );
+    warn =
+      "🟢 Masih dalam batas. Sisa target: " +
+      money(Math.max(0, target - net));
 
   }
 
-  $("propWarning")
-    .textContent=
-      warn;
+  if ($("propWarning"))
+    $("propWarning").textContent = warn;
 }
 
-if($("modeBtn")){
+/* =========================================================
+   TRADE FORM
+   ========================================================= */
 
-  $("modeBtn").onclick=()=>{
+function setupTradeForm() {
 
-    if(!currentUser){
+  if ($("addTradeBtn")) {
 
+    $("addTradeBtn").onclick = () => {
+
+      if (!currentUser) {
+        showAdminLogin();
+        return;
+      }
+
+      show("modal", true);
+
+    };
+
+  }
+
+  if ($("closeModal")) {
+    $("closeModal").onclick =
+      () => show("modal", false);
+  }
+
+  if ($("tradeForm")) {
+
+    $("tradeForm").onsubmit =
+      async e => {
+
+        e.preventDefault();
+
+        if (!currentUser) {
+          showAdminLogin();
+          return;
+        }
+
+        if ($("tradeMsg")) {
+          $("tradeMsg").textContent =
+            "Menyimpan...";
+        }
+
+        const row = {
+
+          user_id:
+            currentUser.id,
+
+          account_id:
+            $("tAccount")?.value || null,
+
+          trade_date:
+            new Date().toISOString(),
+
+          symbol:
+            $("tSymbol")?.value
+              .trim()
+              .toUpperCase(),
+
+          side:
+            $("tSide")?.value || "BUY",
+
+          entry:
+            num("tEntry"),
+
+          exit:
+            num("tExit"),
+
+          risk:
+            num("tRisk"),
+
+          pl:
+            num("tPL"),
+
+          strategy:
+            $("tStrategy")?.value.trim() || "",
+
+          timeframe:
+            $("tTF")?.value.trim() || "",
+
+          session:
+            $("tSession")?.value.trim() || "",
+
+          notes:
+            $("tNotes")?.value.trim() || ""
+
+        };
+
+        const { error } =
+          await sb
+            .from("trades")
+            .insert(row);
+
+        if (error) {
+
+          if ($("tradeMsg"))
+            $("tradeMsg").textContent =
+              error.message;
+
+          return;
+        }
+
+        $("tradeForm").reset();
+
+        if ($("tradeMsg"))
+          $("tradeMsg").textContent =
+            "Trade tersimpan.";
+
+        show("modal", false);
+
+        await loadAdminData();
+
+      };
+
+  }
+}
+
+/* =========================================================
+   ACCOUNTS
+   ========================================================= */
+
+function fillTradeAccounts() {
+
+  const s = $("tAccount");
+
+  if (!s) return;
+
+  s.innerHTML =
+    '<option value="">Pilih akun prop firm</option>' +
+
+    accounts
+      .map(a =>
+        `<option value="${a.id}">
+          ${esc(a.firm)} — ${esc(a.account_name)}
+        </option>`
+      )
+      .join("");
+}
+
+function fillPayoutAccounts() {
+
+  const s = $("pAccount");
+
+  if (!s) return;
+
+  s.innerHTML =
+    accounts
+      .map(a =>
+        `<option value="${a.id}">
+          ${esc(a.firm)} — ${esc(a.account_name)}
+        </option>`
+      )
+      .join("");
+}
+
+function getAccountConsistency(accountId) {
+
+  const rows =
+    trades.filter(
+      t => t.account_id === accountId
+    );
+
+  const daily = {};
+
+  rows.forEach(t => {
+
+    const d =
+      new Date(t.trade_date)
+        .toISOString()
+        .slice(0, 10);
+
+    daily[d] =
+      (daily[d] || 0) +
+      Number(t.pl || 0);
+
+  });
+
+  const total =
+    Object.values(daily)
+      .reduce((s, v) => s + v, 0);
+
+  const positiveDays =
+    Object.values(daily)
+      .filter(v => v > 0);
+
+  const best =
+    positiveDays.length
+      ? Math.max(...positiveDays)
+      : 0;
+
+  return total > 0
+    ? best / total * 100
+    : 0;
+}
+
+function renderAccounts() {
+
+  const box = $("accountList");
+
+  if (!box) return;
+
+  box.innerHTML =
+    accounts.map(a => {
+
+      const ats =
+        trades.filter(
+          t => t.account_id === a.id
+        );
+
+      const pl =
+        ats.reduce(
+          (s, t) => s + Number(t.pl || 0),
+          0
+        );
+
+      const paid =
+        payouts
+          .filter(
+            p =>
+              p.account_id === a.id &&
+              p.status === "Paid"
+          )
+          .reduce(
+            (s, p) =>
+              s + Number(p.amount || 0),
+            0
+          );
+
+      const target =
+        Number(a.account_size) *
+        Number(a.target_pct) /
+        100;
+
+      const progress =
+        target
+          ? Math.max(
+              0,
+              pl / target * 100
+            )
+          : 0;
+
+      const consistency =
+        getAccountConsistency(a.id);
+
+      const rule =
+        Number(a.consistency_pct || 0);
+
+      const consistencyClass =
+        ats.length
+          ? (
+              !rule ||
+              consistency <= rule
+                ? "positive"
+                : "negative"
+            )
+          : "neutralValue";
+
+      return `
+        <div class="panel accountCard">
+
+          <div class="accountTop">
+
+            <div>
+              <h2>${esc(a.firm)}</h2>
+              <small>
+                ${esc(a.account_name)}
+              </small>
+            </div>
+
+            <span class="status">
+              ${esc(a.status || "")}
+            </span>
+
+          </div>
+
+          <div class="accountMetrics">
+
+            <div>
+              <small>Size</small>
+              <b>${money(a.account_size)}</b>
+            </div>
+
+            <div>
+              <small>Fee</small>
+              <b class="negative">
+                ${money(-Number(a.purchase_fee || 0))}
+              </b>
+            </div>
+
+            <div>
+              <small>Trading P/L</small>
+              <b class="${pl >= 0 ? "positive" : "negative"}">
+                ${money(pl)}
+              </b>
+            </div>
+
+            <div>
+              <small>Payout</small>
+              <b class="${paid > 0 ? "positive" : ""}">
+                ${money(paid)}
+              </b>
+            </div>
+
+            <div>
+              <small>Consistency</small>
+              <b class="${consistencyClass}">
+                ${ats.length
+                  ? consistency.toFixed(1) + "%"
+                  : "—"}
+              </b>
+            </div>
+
+            <div>
+              <small>Rule</small>
+              <b>
+                ${rule ? rule + "%" : "—"}
+              </b>
+            </div>
+
+          </div>
+
+          <div class="progress">
+            <i style="
+              width:${Math.min(
+                100,
+                Math.max(0, progress)
+              )}%
+            "></i>
+          </div>
+
+          <div class="accountRuleLine">
+
+            <span>
+              Target ${Number(a.target_pct)}%
+            </span>
+
+            <span>
+              Max DD ${Number(a.max_dd_pct)}%
+            </span>
+
+            <span>
+              Daily ${Number(a.daily_loss_pct)}%
+            </span>
+
+            <span>
+              Consistency ${rule}%
+            </span>
+
+          </div>
+
+          ${
+            currentUser
+              ? `
+                <div class="accountActions">
+
+                  <button
+                    class="secondary"
+                    onclick="editAccount('${a.id}')">
+                    ✏️ Edit Account
+                  </button>
+
+                  <button
+                    class="secondary"
+                    onclick="setAccountStatus('${a.id}')">
+                    Ubah Status
+                  </button>
+
+                  <button
+                    class="danger"
+                    onclick="deleteAccount('${a.id}')">
+                    Hapus
+                  </button>
+
+                </div>
+              `
+              : ""
+          }
+
+        </div>
+      `;
+
+    }).join("") ||
+
+    `
+      <div class="panel emptyState">
+        <strong>
+          Belum ada akun Prop Firm
+        </strong>
+      </div>
+    `;
+}
+
+async function setAccountStatus(id) {
+
+  if (!currentUser) {
+    showAdminLogin();
+    return;
+  }
+
+  const a =
+    accounts.find(
+      x => x.id === id
+    );
+
+  if (!a) return;
+
+  const status =
+    prompt(
+      "Status baru: Phase 1, Phase 2, Funded, Payout, Failed, Closed",
+      a.status
+    );
+
+  if (!status) return;
+
+  const { error } =
+    await sb
+      .from("prop_accounts")
+      .update({ status })
+      .eq("id", id)
+      .eq("user_id", currentUser.id);
+
+  if (error) {
+    alert(error.message);
+    return;
+  }
+
+  await loadAdminData();
+}
+
+async function deleteAccount(id) {
+
+  if (!currentUser) {
+    showAdminLogin();
+    return;
+  }
+
+  if (!confirm("Hapus akun ini?")) return;
+
+  const { error } =
+    await sb
+      .from("prop_accounts")
+      .delete()
+      .eq("id", id)
+      .eq("user_id", currentUser.id);
+
+  if (error) {
+    alert(error.message);
+    return;
+  }
+
+  await loadAdminData();
+}
+
+async function editAccount(id) {
+
+  if (!currentUser) {
+    showAdminLogin();
+    return;
+  }
+
+  const a =
+    accounts.find(
+      x => x.id === id
+    );
+
+  if (!a) return;
+
+  editingAccountId = id;
+
+  if ($("aFirm"))
+    $("aFirm").value = a.firm || "";
+
+  if ($("aName"))
+    $("aName").value =
+      a.account_name || "";
+
+  if ($("aSize"))
+    $("aSize").value =
+      a.account_size ?? 0;
+
+  if ($("aFee"))
+    $("aFee").value =
+      a.purchase_fee ?? 0;
+
+  if ($("aStatus"))
+    $("aStatus").value =
+      a.status || "Phase 1";
+
+  if ($("aTarget"))
+    $("aTarget").value =
+      a.target_pct ?? 6;
+
+  if ($("aMaxDD"))
+    $("aMaxDD").value =
+      a.max_dd_pct ?? 4;
+
+  if ($("aDaily"))
+    $("aDaily").value =
+      a.daily_loss_pct ?? 2;
+
+  if ($("aConsistency"))
+    $("aConsistency").value =
+      a.consistency_pct ?? 20;
+
+  if ($("aStart"))
+    $("aStart").value =
+      a.start_date || "";
+
+  if ($("aNotes"))
+    $("aNotes").value =
+      a.notes || "";
+
+  if ($("accountModalTitle"))
+    $("accountModalTitle").textContent =
+      "Edit Prop Firm Account";
+
+  if ($("accountSubmitBtn"))
+    $("accountSubmitBtn").textContent =
+      "Update Account";
+
+  show("accountModal", true);
+}
+
+window.editAccount = editAccount;
+
+/* =========================================================
+   ACCOUNT FORM
+   ========================================================= */
+
+function setupAccountForm() {
+
+  if ($("addAccountBtn")) {
+
+    $("addAccountBtn").onclick = () => {
+
+      if (!currentUser) {
+        showAdminLogin();
+        return;
+      }
+
+      editingAccountId = null;
+
+      $("accountForm")?.reset();
+
+      if ($("accountModalTitle"))
+        $("accountModalTitle").textContent =
+          "Tambah Prop Firm Account";
+
+      if ($("accountSubmitBtn"))
+        $("accountSubmitBtn").textContent =
+          "Simpan Akun";
+
+      if ($("aStatus"))
+        $("aStatus").value =
+          "Phase 1";
+
+      if ($("aTarget"))
+        $("aTarget").value = 6;
+
+      if ($("aMaxDD"))
+        $("aMaxDD").value = 4;
+
+      if ($("aDaily"))
+        $("aDaily").value = 2;
+
+      if ($("aConsistency"))
+        $("aConsistency").value = 20;
+
+      show("accountModal", true);
+
+    };
+
+  }
+
+  if ($("closeAccountModal")) {
+
+    $("closeAccountModal").onclick =
+      () => show("accountModal", false);
+
+  }
+
+  if ($("accountForm")) {
+
+    $("accountForm").onsubmit =
+      async e => {
+
+        e.preventDefault();
+
+        if (!currentUser) {
+          showAdminLogin();
+          return;
+        }
+
+        const n = id =>
+          parseFloat($(id)?.value) || 0;
+
+        const row = {
+
+          firm:
+            $("aFirm")?.value.trim(),
+
+          account_name:
+            $("aName")?.value.trim(),
+
+          account_size:
+            n("aSize"),
+
+          purchase_fee:
+            n("aFee"),
+
+          status:
+            $("aStatus")?.value,
+
+          target_pct:
+            n("aTarget"),
+
+          max_dd_pct:
+            n("aMaxDD"),
+
+          daily_loss_pct:
+            n("aDaily"),
+
+          consistency_pct:
+            n("aConsistency"),
+
+          start_date:
+            $("aStart")?.value || null,
+
+          notes:
+            $("aNotes")?.value.trim() || ""
+
+        };
+
+        let result;
+
+        if (editingAccountId) {
+
+          result =
+            await sb
+              .from("prop_accounts")
+              .update(row)
+              .eq("id", editingAccountId)
+              .eq("user_id", currentUser.id);
+
+        } else {
+
+          result =
+            await sb
+              .from("prop_accounts")
+              .insert({
+                ...row,
+                user_id:
+                  currentUser.id
+              });
+
+        }
+
+        if (result.error) {
+
+          if ($("accountMsg"))
+            $("accountMsg").textContent =
+              result.error.message;
+
+          return;
+        }
+
+        editingAccountId = null;
+
+        show("accountModal", false);
+
+        await loadAdminData();
+
+      };
+
+  }
+}
+
+/* =========================================================
+   PAYOUT
+   ========================================================= */
+
+function renderPayouts() {
+
+  const box = $("payoutList");
+
+  if (!box) return;
+
+  box.innerHTML =
+    payouts.map(p => {
+
+      const a =
+        accounts.find(
+          x => x.id === p.account_id
+        );
+
+      return `
+        <div class="trade">
+
+          <div>
+            <b>${money(p.amount)}</b>
+
+            <span class="pill">
+              ${esc(p.status)}
+            </span>
+          </div>
+
+          <small>
+            ${esc(a?.firm || "")}
+            ·
+            ${esc(a?.account_name || "")}
+            ·
+            ${esc(p.payout_date || "")}
+          </small>
+
+          <small>
+            ${esc(p.note || "")}
+          </small>
+
+        </div>
+      `;
+
+    }).join("") ||
+
+    `<p class="muted">
+      Belum ada payout.
+    </p>`;
+}
+
+function setupPayoutForm() {
+
+  if ($("addPayoutBtn")) {
+
+    $("addPayoutBtn").onclick = () => {
+
+      if (!currentUser) {
+        showAdminLogin();
+        return;
+      }
+
+      fillPayoutAccounts();
+
+      show("payoutModal", true);
+
+    };
+
+  }
+
+  if ($("closePayoutModal")) {
+
+    $("closePayoutModal").onclick =
+      () => show("payoutModal", false);
+
+  }
+
+  if ($("payoutForm")) {
+
+    $("payoutForm").onsubmit =
+      async e => {
+
+        e.preventDefault();
+
+        if (!currentUser) {
+          showAdminLogin();
+          return;
+        }
+
+        const row = {
+
+          user_id:
+            currentUser.id,
+
+          account_id:
+            $("pAccount")?.value,
+
+          amount:
+            parseFloat(
+              $("pAmount")?.value
+            ) || 0,
+
+          payout_date:
+            $("pDate")?.value,
+
+          status:
+            $("pStatus")?.value,
+
+          note:
+            $("pNote")?.value.trim() || ""
+
+        };
+
+        const { error } =
+          await sb
+            .from("payouts")
+            .insert(row);
+
+        if (error) {
+
+          if ($("payoutMsg"))
+            $("payoutMsg").textContent =
+              error.message;
+
+          return;
+        }
+
+        $("payoutForm").reset();
+
+        show("payoutModal", false);
+
+        await loadAdminData();
+
+      };
+
+  }
+}
+
+/* =========================================================
+   GLOBAL DASHBOARD
+   ========================================================= */
+
+function renderGlobal() {
+
+  const fees =
+    accounts.reduce(
+      (s, a) =>
+        s +
+        Number(a.purchase_fee || 0),
+      0
+    );
+
+  const pays =
+    payouts
+      .filter(p => p.status === "Paid")
+      .reduce(
+        (s, p) =>
+          s +
+          Number(p.amount || 0),
+        0
+      );
+
+  const vals =
+    trades.map(
+      t => Number(t.pl || 0)
+    );
+
+  const pl =
+    vals.reduce(
+      (s, v) => s + v,
+      0
+    );
+
+  const wins =
+    vals.filter(v => v > 0);
+
+  const losses =
+    vals.filter(v => v < 0);
+
+  const grossW =
+    wins.reduce(
+      (s, v) => s + v,
+      0
+    );
+
+  const grossL =
+    Math.abs(
+      losses.reduce(
+        (s, v) => s + v,
+        0
+      )
+    );
+
+  const wr =
+    vals.length
+      ? wins.length /
+        vals.length *
+        100
+      : 0;
+
+  const pf =
+    grossL
+      ? grossW / grossL
+      : 0;
+
+  const netCash =
+    pays - fees;
+
+  const roi =
+    fees
+      ? netCash / fees * 100
+      : 0;
+
+  const countStatus =
+    s =>
+      accounts.filter(
+        a =>
+          (a.status || "")
+            .toLowerCase()
+            .replace(/\s+/g, " ") === s
+      ).length;
+
+  const values = [
+
+    ["gTradingPL", money(pl)],
+    ["gWinRate", wr.toFixed(1) + "%"],
+    ["gTradeCount", vals.length],
+    ["gProfitFactor", pf.toFixed(2)],
+
+    ["gFees", money(-fees)],
+    ["gPayouts", money(pays)],
+    ["gNet", money(netCash)],
+    ["gCashROI", roi.toFixed(1) + "%"],
+
+    ["gAccounts", accounts.length],
+    ["gPhase1", countStatus("phase 1")],
+    ["gPhase2", countStatus("phase 2")],
+    ["gFunded", countStatus("funded")]
+
+  ];
+
+  values.forEach(([id, value]) => {
+
+    if ($(id)) {
+      $(id).textContent = value;
+    }
+
+  });
+
+  setValueClass(
+    "gTradingPL",
+    pl
+  );
+
+  setValueClass(
+    "gWinRate",
+    wr,
+    "winrate"
+  );
+
+  setValueClass(
+    "gProfitFactor",
+    pf
+  );
+
+  setValueClass(
+    "gNet",
+    netCash
+  );
+
+  const todayKey =
+    new Date()
+      .toISOString()
+      .slice(0, 10);
+
+  const daily = {};
+
+  trades.forEach(t => {
+
+    const d =
+      new Date(t.trade_date)
+        .toISOString()
+        .slice(0, 10);
+
+    daily[d] =
+      (daily[d] || 0) +
+      Number(t.pl || 0);
+
+  });
+
+  const todayPL =
+    daily[todayKey] || 0;
+
+  const dayVals =
+    Object.values(daily);
+
+  const bestDay =
+    dayVals.length
+      ? Math.max(...dayVals)
+      : 0;
+
+  const worstDay =
+    dayVals.length
+      ? Math.min(...dayVals)
+      : 0;
+
+  if ($("gTodayPL"))
+    $("gTodayPL").textContent =
+      money(todayPL);
+
+  if ($("gBestDay"))
+    $("gBestDay").textContent =
+      money(bestDay);
+
+  if ($("gWorstDay"))
+    $("gWorstDay").textContent =
+      money(worstDay);
+
+  if ($("gRiskAccounts")) {
+
+    const risk =
+      accounts.filter(a => {
+
+        const c =
+          getAccountConsistency(a.id);
+
+        const rule =
+          Number(a.consistency_pct || 0);
+
+        return rule > 0 && c > rule;
+
+      }).length;
+
+    $("gRiskAccounts").textContent =
+      risk;
+
+  }
+
+  const list =
+    $("globalAccountList");
+
+  if (list) {
+
+    list.innerHTML =
+      accounts.map(a => {
+
+        const plA =
+          trades
+            .filter(
+              t =>
+                t.account_id === a.id
+            )
+            .reduce(
+              (s, t) =>
+                s + Number(t.pl || 0),
+              0
+            );
+
+        const paid =
+          payouts
+            .filter(
+              p =>
+                p.account_id === a.id &&
+                p.status === "Paid"
+            )
+            .reduce(
+              (s, p) =>
+                s +
+                Number(p.amount || 0),
+              0
+            );
+
+        return `
+          <div class="globalAccountRow">
+
+            <div>
+              <b>
+                ${esc(a.firm)}
+                —
+                ${esc(a.account_name)}
+              </b>
+
+              <span class="dashStatus">
+                ${esc(a.status || "")}
+              </span>
+            </div>
+
+            <div class="accountOverviewStats">
+
+              <small>
+                P/L ${money(plA)}
+                ·
+                Payout ${money(paid)}
+              </small>
+
+              <span>
+                Consistency
+                ${getAccountConsistency(a.id).toFixed(1)}%
+              </span>
+
+            </div>
+
+          </div>
+        `;
+
+      }).join("") ||
+
+      `<p class="muted">
+        Belum ada akun Prop Firm.
+      </p>`;
+
+  }
+
+  drawGlobalEquity();
+}
+
+function drawGlobalEquity() {
+
+  const c =
+    $("globalEquityChart");
+
+  if (!c) return;
+
+  const ts =
+    [...trades].sort(
+      (a, b) =>
+        new Date(a.trade_date) -
+        new Date(b.trade_date)
+    );
+
+  const ctx =
+    c.getContext("2d");
+
+  const w =
+    c.width =
+      (c.clientWidth || 600) * 2;
+
+  const h =
+    c.height =
+      250 * 2;
+
+  ctx.clearRect(
+    0,
+    0,
+    w,
+    h
+  );
+
+  if (!ts.length) {
+
+    if ($("gEquityLabel"))
+      $("gEquityLabel").textContent =
+        "$0.00";
+
+    return;
+  }
+
+  let eq = 0;
+
+  const pts = [0];
+
+  ts.forEach(t => {
+
+    eq += Number(t.pl || 0);
+
+    pts.push(eq);
+
+  });
+
+  if ($("gEquityLabel"))
+    $("gEquityLabel").textContent =
+      money(eq);
+
+  let min =
+    Math.min(...pts, 0);
+
+  let max =
+    Math.max(...pts, 0);
+
+  if (min === max) {
+    min -= 1;
+    max += 1;
+  }
+
+  const X =
+    i =>
+      i /
+      (pts.length - 1) *
+      w;
+
+  const Y =
+    v =>
+      h -
+      (v - min) /
+      (max - min) *
+      h;
+
+  ctx.beginPath();
+
+  pts.forEach((v, i) => {
+
+    if (i === 0)
+      ctx.moveTo(X(i), Y(v));
+    else
+      ctx.lineTo(X(i), Y(v));
+
+  });
+
+  ctx.strokeStyle =
+    "#3fb950";
+
+  ctx.lineWidth = 5;
+
+  ctx.stroke();
+}
+
+/* =========================================================
+   JOURNAL
+   ========================================================= */
+
+function renderJournal() {
+
+  const total =
+    trades.length;
+
+  const wins =
+    trades.filter(
+      t => Number(t.pl) > 0
+    );
+
+  const losses =
+    trades.filter(
+      t => Number(t.pl) < 0
+    );
+
+  const net =
+    trades.reduce(
+      (a, t) =>
+        a + Number(t.pl || 0),
+      0
+    );
+
+  const grossWin =
+    wins.reduce(
+      (a, t) =>
+        a + Number(t.pl),
+      0
+    );
+
+  const grossLoss =
+    Math.abs(
+      losses.reduce(
+        (a, t) =>
+          a + Number(t.pl),
+        0
+      )
+    );
+
+  const wr =
+    total
+      ? wins.length /
+        total *
+        100
+      : 0;
+
+  const pf =
+    grossLoss
+      ? grossWin /
+        grossLoss
+      : grossWin
+        ? Infinity
+        : 0;
+
+  if ($("totalTrades"))
+    $("totalTrades").textContent =
+      total;
+
+  if ($("winRate"))
+    $("winRate").textContent =
+      wr.toFixed(1) + "%";
+
+  if ($("netPL"))
+    $("netPL").textContent =
+      money(net);
+
+  if ($("profitFactor"))
+    $("profitFactor").textContent =
+      pf === Infinity
+        ? "∞"
+        : pf.toFixed(2);
+
+  setValueClass(
+    "winRate",
+    wr,
+    "winrate"
+  );
+
+  setValueClass(
+    "netPL",
+    net
+  );
+
+  setValueClass(
+    "profitFactor",
+    pf
+  );
+
+  let equity = 0;
+  let peak = 0;
+  let maxDD = 0;
+
+  const eq = [];
+
+  trades.forEach(t => {
+
+    equity +=
+      Number(t.pl || 0);
+
+    peak =
+      Math.max(
+        peak,
+        equity
+      );
+
+    maxDD =
+      Math.max(
+        maxDD,
+        peak - equity
+      );
+
+    eq.push(equity);
+
+  });
+
+  if ($("maxDD"))
+    $("maxDD").textContent =
+      money(-maxDD);
+
+  if ($("equityLabel"))
+    $("equityLabel").textContent =
+      money(equity);
+
+  const days = {};
+
+  trades.forEach(t => {
+
+    const d =
+      new Date(t.trade_date)
+        .toISOString()
+        .slice(0, 10);
+
+    days[d] =
+      (days[d] || 0) +
+      Number(t.pl || 0);
+
+  });
+
+  const bestDay =
+    Math.max(
+      0,
+      ...Object.values(days)
+    );
+
+  if ($("bestDay"))
+    $("bestDay").textContent =
+      money(bestDay);
+
+  const q =
+    $("search")?.value
+      .toLowerCase() || "";
+
+  const filtered =
+    trades.filter(t => {
+
+      const text =
+        [
+          t.symbol,
+          t.strategy,
+          t.session
+        ]
+          .join(" ")
+          .toLowerCase();
+
+      return text.includes(q);
+
+    });
+
+  const list =
+    $("tradeList");
+
+  if (list) {
+
+    list.innerHTML =
+      filtered
+        .slice()
+        .reverse()
+        .map(t => {
+
+          return `
+            <div class="trade">
+
+              <div>
+
+                <b>
+                  ${esc(t.symbol)}
+                </b>
+
+                <span class="pill">
+                  ${esc(t.side)}
+                </span>
+
+                <small>
+                  ${new Date(
+                    t.trade_date
+                  ).toLocaleString()}
+                </small>
+
+              </div>
+
+              <div>
+
+                <b class="${
+                  Number(t.pl) >= 0
+                    ? "positive"
+                    : "negative"
+                }">
+                  ${money(t.pl)}
+                </b>
+
+                ${
+                  currentUser
+                    ? `
+                      <button
+                        class="danger"
+                        onclick="deleteTrade('${t.id}')">
+                        Hapus
+                      </button>
+                    `
+                    : ""
+                }
+
+              </div>
+
+              <small>
+                ${esc(t.strategy || "")}
+                ${esc(t.timeframe || "")}
+                ${esc(t.session || "")}
+              </small>
+
+            </div>
+          `;
+
+        }).join("") ||
+
+      `<p class="muted">
+        Belum ada trade.
+      </p>`;
+
+  }
+
+  drawEquity(eq);
+}
+
+function drawEquity(data) {
+
+  const c =
+    $("equityChart");
+
+  if (!c) return;
+
+  const dpr =
+    window.devicePixelRatio || 1;
+
+  const w =
+    c.clientWidth || 600;
+
+  const h = 260;
+
+  c.width =
+    w * dpr;
+
+  c.height =
+    h * dpr;
+
+  const ctx =
+    c.getContext("2d");
+
+  ctx.scale(dpr, dpr);
+
+  ctx.clearRect(
+    0,
+    0,
+    w,
+    h
+  );
+
+  if (!data.length) return;
+
+  const min =
+    Math.min(0, ...data);
+
+  const max =
+    Math.max(0, ...data);
+
+  const range =
+    max - min || 1;
+
+  ctx.beginPath();
+
+  data.forEach((v, i) => {
+
+    const px =
+      data.length === 1
+        ? w / 2
+        : i /
+          (data.length - 1) *
+          w;
+
+    const py =
+      h -
+      (v - min) /
+      range *
+      h *
+      0.8 -
+      10;
+
+    if (i === 0)
+      ctx.moveTo(px, py);
+    else
+      ctx.lineTo(px, py);
+
+  });
+
+  ctx.strokeStyle =
+    "#27d39a";
+
+  ctx.lineWidth = 3;
+
+  ctx.stroke();
+}
+
+window.deleteTrade =
+  async function(id) {
+
+    if (!currentUser) {
       showAdminLogin();
+      return;
+    }
 
+    if (!confirm("Hapus trade ini?"))
+      return;
+
+    const { error } =
+      await sb
+        .from("trades")
+        .delete()
+        .eq("id", id)
+        .eq("user_id", currentUser.id);
+
+    if (error) {
+
+      alert(error.message);
       return;
 
     }
 
-    show(
-      "propPanel",
-      $("propPanel")
-        .classList
-        .contains("hidden")
-    );
-
-    renderProp();
+    await loadAdminData();
 
   };
 
-}
-
-if($("savePropBtn")){
-
-  $("savePropBtn")
-    .onclick=
-      saveProp;
-
-}
-
 /* =========================================================
    PERFORMANCE
-========================================================= */
+   ========================================================= */
 
-let performanceChart;
+function setupPerfFilters() {
 
-function perfMoney(v){
+  const fill =
+    (id, values) => {
 
-  return money(v);
+      const s = $(id);
 
-}
+      if (!s) return;
 
-function setupPerfFilters(){
-
-  const fill=
-    (id,vals)=>{
-
-      const s=$(id);
-
-      if(!s)return;
-
-      const old=
+      const old =
         s.value;
 
-      s.innerHTML=
-        '<option value="">Semua</option>'+
+      s.innerHTML =
+        '<option value="">Semua</option>' +
+
         [
           ...new Set(
-            vals.filter(Boolean)
+            values.filter(Boolean)
           )
         ]
-        .sort()
-        .map(
-          v=>
-            `<option>
-              ${esc(v)}
-            </option>`
-        )
-        .join("");
+          .sort()
+          .map(
+            v =>
+              `<option value="${esc(v)}">
+                ${esc(v)}
+              </option>`
+          )
+          .join("");
 
-      s.value=old;
+      s.value = old;
 
     };
 
-  const opts=
-    accounts.map(
-      a=>({
-
-        v:a.id,
-
-        t:
-          `${a.firm} — ${a.account_name}`
-
-      })
-    );
-
-  const a=
+  const account =
     $("perfAccount");
 
-  if(a){
+  if (account) {
 
-    const old=
-      a.value;
+    const old =
+      account.value;
 
-    a.innerHTML=
-      '<option value="">Semua Akun</option>'+
-      opts
+    account.innerHTML =
+      '<option value="">Semua Akun</option>' +
+
+      accounts
         .map(
-          x=>
-            `<option value="${x.v}">
-              ${esc(x.t)}
+          a =>
+            `<option value="${a.id}">
+              ${esc(a.firm)}
+              —
+              ${esc(a.account_name)}
             </option>`
         )
         .join("");
 
-    a.value=old;
+    account.value = old;
 
   }
 
   fill(
     "perfStrategy",
     trades.map(
-      t=>t.strategy
+      t => t.strategy
     )
   );
 
   fill(
     "perfTF",
     trades.map(
-      t=>t.timeframe
+      t => t.timeframe
     )
   );
 
   fill(
     "perfSession",
     trades.map(
-      t=>t.session
+      t => t.session
     )
   );
 }
 
-function getPerfTrades(){
+function getPerfTrades() {
 
-  const aid=
-    $("perfAccount")
-      ?.value || "";
+  const aid =
+    $("perfAccount")?.value || "";
 
-  const st=
-    $("perfStrategy")
-      ?.value || "";
+  const st =
+    $("perfStrategy")?.value || "";
 
-  const tf=
-    $("perfTF")
-      ?.value || "";
+  const tf =
+    $("perfTF")?.value || "";
 
-  const se=
-    $("perfSession")
-      ?.value || "";
+  const se =
+    $("perfSession")?.value || "";
 
-  const from=
-    $("perfFrom")
-      ?.value || "";
+  const from =
+    $("perfFrom")?.value || "";
 
-  const to=
-    $("perfTo")
-      ?.value || "";
+  const to =
+    $("perfTo")?.value || "";
 
   return trades
-    .filter(t=>{
+    .filter(t => {
 
-      const d=
-        new Date(
-          t.trade_date
-        )
-        .toISOString()
-        .slice(0,10);
+      const d =
+        new Date(t.trade_date)
+          .toISOString()
+          .slice(0, 10);
 
-      return(
+      return (
         (!aid ||
-          t.account_id===aid)&&
+          t.account_id === aid) &&
+
         (!st ||
-          t.strategy===st)&&
+          t.strategy === st) &&
+
         (!tf ||
-          t.timeframe===tf)&&
+          t.timeframe === tf) &&
+
         (!se ||
-          t.session===se)&&
+          t.session === se) &&
+
         (!from ||
-          d>=from)&&
+          d >= from) &&
+
         (!to ||
-          d<=to)
+          d <= to)
       );
 
     })
     .sort(
-      (a,b)=>
-        new Date(a.trade_date)-
+      (a, b) =>
+        new Date(a.trade_date) -
         new Date(b.trade_date)
     );
 }
 
-function groupPerf(ts,key){
+function groupPerf(ts, key) {
 
-  const g={};
+  const g = {};
 
-  ts.forEach(t=>{
+  ts.forEach(t => {
 
-    const k=
+    const k =
       t[key] ||
       "Unknown";
 
-    if(!g[k]){
+    if (!g[k]) {
 
-      g[k]={
-        n:0,
-        w:0,
-        l:0,
-        pl:0
+      g[k] = {
+        n: 0,
+        w: 0,
+        l: 0,
+        pl: 0
       };
 
     }
 
-    const p=
-      Number(t.pl||0);
+    const p =
+      Number(t.pl || 0);
 
     g[k].n++;
-    g[k].pl+=p;
+    g[k].pl += p;
 
-    if(p>0)g[k].w++;
-    if(p<0)g[k].l++;
+    if (p > 0)
+      g[k].w++;
+
+    if (p < 0)
+      g[k].l++;
 
   });
 
   return Object
     .entries(g)
     .map(
-      ([name,x])=>({
-
+      ([name, x]) => ({
         ...x,
-
         name,
-
         wr:
           x.n
-            ?x.w/x.n*100
-            :0
-
+            ? x.w /
+              x.n *
+              100
+            : 0
       })
     )
     .sort(
-      (a,b)=>
-        b.pl-a.pl
+      (a, b) =>
+        b.pl - a.pl
     );
 }
 
-function renderPerfTable(
-  id,
-  rows
-){
+function renderPerfTable(id, rows) {
 
-  const el=$(id);
+  const el = $(id);
 
-  if(!el)return;
+  if (!el) return;
 
-  el.innerHTML=
-    rows
-      .map(
-        x=>
-          `<div class="trade">
+  el.innerHTML =
+    rows.map(x => {
 
-            <div>
+      return `
+        <div class="trade">
 
-              <b>
-                ${esc(x.name)}
-              </b>
+          <div>
 
-              <span>
-                ${x.wr.toFixed(1)}% WR
-              </span>
+            <b>
+              ${esc(x.name)}
+            </b>
 
-            </div>
+            <span>
+              ${x.wr.toFixed(1)}% WR
+            </span>
 
-            <small>
-              ${x.n} trades ·
-              ${x.w}W /
-              ${x.l}L ·
+          </div>
 
-              <b class="${
-                x.pl>=0
-                  ?"positive"
-                  :"negative"
-              }">
+          <small>
+            ${x.n} trades
+            ·
+            ${x.w}W /
+            ${x.l}L
+            ·
 
-                ${money(x.pl)}
+            <b class="${
+              x.pl >= 0
+                ? "positive"
+                : "negative"
+            }">
+              ${money(x.pl)}
+            </b>
+          </small>
 
-              </b>
+        </div>
+      `;
 
-            </small>
+    }).join("") ||
 
-          </div>`
-      )
-      .join("")
-      ||
-      '<p class="muted">Belum ada data.</p>';
+    `<p class="muted">
+      Belum ada data.
+    </p>`;
 }
 
-function renderPerformance(){
+function renderPerformance() {
 
   setupPerfFilters();
 
-  const ts=
+  const ts =
     getPerfTrades();
 
-  const vals=
+  const vals =
     ts.map(
-      t=>Number(t.pl||0)
+      t => Number(t.pl || 0)
     );
 
-  const wins=
+  const wins =
     vals.filter(
-      x=>x>0
+      x => x > 0
     );
 
-  const losses=
+  const losses =
     vals.filter(
-      x=>x<0
+      x => x < 0
     );
 
-  const net=
+  const net =
     vals.reduce(
-      (a,b)=>a+b,
+      (a, b) => a + b,
       0
     );
 
-  const grossW=
+  const grossW =
     wins.reduce(
-      (a,b)=>a+b,
+      (a, b) => a + b,
       0
     );
 
-  const grossL=
+  const grossL =
     Math.abs(
       losses.reduce(
-        (a,b)=>a+b,
+        (a, b) => a + b,
         0
       )
     );
 
-  const wr=
+  const wr =
     ts.length
-      ?wins.length/
-       ts.length*100
-      :0;
+      ? wins.length /
+        ts.length *
+        100
+      : 0;
 
-  const pf=
+  const pf =
     grossL
-      ?grossW/grossL
-      :0;
+      ? grossW / grossL
+      : 0;
 
-  const avgW=
+  const avgW =
     wins.length
-      ?grossW/wins.length
-      :0;
+      ? grossW /
+        wins.length
+      : 0;
 
-  const avgL=
+  const avgL =
     losses.length
-      ?grossL/losses.length
-      :0;
+      ? grossL /
+        losses.length
+      : 0;
 
-  const exp=
+  const exp =
     ts.length
-      ?net/ts.length
-      :0;
+      ? net /
+        ts.length
+      : 0;
 
-  let eq=0;
-  let peak=0;
-  let maxDD=0;
+  let eq = 0;
+  let peak = 0;
+  let maxDD = 0;
 
-  ts.forEach(t=>{
+  ts.forEach(t => {
 
-    eq+=Number(t.pl||0);
+    eq +=
+      Number(t.pl || 0);
 
-    peak=
+    peak =
       Math.max(
         peak,
         eq
       );
 
-    maxDD=
+    maxDD =
       Math.max(
         maxDD,
-        peak-eq
+        peak - eq
       );
 
   });
 
-  const days={};
+  const days = {};
 
-  ts.forEach(t=>{
+  ts.forEach(t => {
 
-    const d=
-      new Date(
-        t.trade_date
-      )
-      .toISOString()
-      .slice(0,10);
+    const d =
+      new Date(t.trade_date)
+        .toISOString()
+        .slice(0, 10);
 
-    days[d]=
-      (days[d]||0)+
-      Number(t.pl||0);
+    days[d] =
+      (days[d] || 0) +
+      Number(t.pl || 0);
 
   });
 
-  const dayVals=
+  const dayVals =
     Object.values(days);
 
-  const best=
+  const best =
     dayVals.length
-      ?Math.max(
-        ...dayVals
-      )
-      :0;
+      ? Math.max(...dayVals)
+      : 0;
 
-  const worst=
+  const worst =
     dayVals.length
-      ?Math.min(
-        ...dayVals
-      )
-      :0;
+      ? Math.min(...dayVals)
+      : 0;
 
-  [
-    ["pTotal",ts.length],
+  const values = [
 
-    [
-      "pWinRate",
-      wr.toFixed(1)+"%"
-    ],
+    ["pTotal", ts.length],
+    ["pWinRate", wr.toFixed(1) + "%"],
+    ["pNet", money(net)],
+    ["pPF", pf.toFixed(2)],
+    ["pAvgWin", money(avgW)],
+    ["pAvgLoss", money(-avgL)],
+    ["pExpectancy", money(exp)],
+    ["pMaxDD", money(-maxDD)],
+    ["pBestDay", money(best)],
+    ["pWorstDay", money(worst)],
+    ["pWins", wins.length],
+    ["pLosses", losses.length],
+    ["perfEquity", money(eq)]
 
-    [
-      "pNet",
-      money(net)
-    ],
+  ];
 
-    [
-      "pPF",
-      pf.toFixed(2)
-    ],
+  values.forEach(([id, v]) => {
 
-    [
-      "pAvgWin",
-      money(avgW)
-    ],
-
-    [
-      "pAvgLoss",
-      money(-avgL)
-    ],
-
-    [
-      "pExpectancy",
-      money(exp)
-    ],
-
-    [
-      "pMaxDD",
-      money(-maxDD)
-    ],
-
-    [
-      "pBestDay",
-      money(best)
-    ],
-
-    [
-      "pWorstDay",
-      money(worst)
-    ],
-
-    [
-      "pWins",
-      wins.length
-    ],
-
-    [
-      "pLosses",
-      losses.length
-    ],
-
-    [
-      "perfEquity",
-      money(eq)
-    ]
-
-  ].forEach(
-    ([id,v])=>{
-
-      if($(id)){
-
-        $(id)
-          .textContent=v;
-
-      }
-
+    if ($(id)) {
+      $(id).textContent = v;
     }
-  );
+
+  });
 
   renderPerfTable(
     "perfAccounts",
     groupPerf(
       ts,
       "account_id"
-    )
-    .map(x=>{
+    ).map(x => {
 
-      const a=
+      const a =
         accounts.find(
-          a=>a.id===x.name
+          a => a.id === x.name
         );
 
-      x.name=
+      x.name =
         a
-          ?`${a.firm} — ${a.account_name}`
-          :x.name;
+          ? `${a.firm} — ${a.account_name}`
+          : x.name;
 
       return x;
 
@@ -1644,74 +2735,64 @@ function renderPerformance(){
     )
   );
 
-  const pd=
+  const pd =
     Object
       .entries(days)
       .sort(
-        (a,b)=>
-          b[0]
-          .localeCompare(
-            a[0]
-          )
+        (a, b) =>
+          b[0].localeCompare(a[0])
       );
 
-  if($("perfDays")){
+  if ($("perfDays")) {
 
-    $("perfDays")
-      .innerHTML=
-        pd
-          .map(
-            ([d,p])=>
-              `<div class="trade">
+    $("perfDays").innerHTML =
+      pd.map(
+        ([d, p]) =>
+          `
+            <div class="trade">
 
-                <div>
+              <div>
+                <b>${d}</b>
 
-                  <b>
-                    ${d}
-                  </b>
+                <b class="${
+                  p >= 0
+                    ? "positive"
+                    : "negative"
+                }">
+                  ${money(p)}
+                </b>
+              </div>
 
-                  <b class="${
-                    p>=0
-                      ?"positive"
-                      :"negative"
-                  }">
+            </div>
+          `
+      ).join("") ||
 
-                    ${money(p)}
-
-                  </b>
-
-                </div>
-
-              </div>`
-          )
-          .join("")
-          ||
-          '<p class="muted">Belum ada data.</p>';
+      `<p class="muted">
+        Belum ada data.
+      </p>`;
 
   }
 
-  drawPerformanceChart(
-    ts
-  );
+  drawPerformanceChart(ts);
 }
 
-function drawPerformanceChart(ts){
+function drawPerformanceChart(ts) {
 
-  const c=
+  const c =
     $("performanceChart");
 
-  if(!c)return;
+  if (!c) return;
 
-  const ctx=
+  const ctx =
     c.getContext("2d");
 
-  const w=
-    c.width=
-      c.clientWidth*2;
+  const w =
+    c.width =
+      (c.clientWidth || 600) * 2;
 
-  const h=
-    c.height=
-      280*2;
+  const h =
+    c.height =
+      280 * 2;
 
   ctx.clearRect(
     0,
@@ -1720,1439 +2801,118 @@ function drawPerformanceChart(ts){
     h
   );
 
-  if(!ts.length)return;
+  if (!ts.length)
+    return;
 
-  let eq=0;
+  let eq = 0;
 
-  const pts=[0];
+  const pts = [0];
 
-  ts.forEach(t=>{
+  ts.forEach(t => {
 
-    eq+=
-      Number(t.pl||0);
+    eq +=
+      Number(t.pl || 0);
 
     pts.push(eq);
 
   });
 
-  let min=
+  let min =
     Math.min(...pts);
 
-  let max=
+  let max =
     Math.max(...pts);
 
-  if(min===max){
+  if (min === max) {
 
-    min-=1;
-    max+=1;
+    min -= 1;
+    max += 1;
 
   }
 
   ctx.beginPath();
 
-  ctx.strokeStyle=
-    "#58a6ff";
-
-  ctx.lineWidth=5;
-
-  pts.forEach(
-    (v,i)=>{
-
-      const x=
-        i/
-        (pts.length-1)*
-        w;
-
-      const y=
-        h-
-        (v-min)/
-        (max-min)*
-        h;
-
-      if(i===0){
-
-        ctx.moveTo(
-          x,
-          y
-        );
-
-      }else{
-
-        ctx.lineTo(
-          x,
-          y
-        );
-
-      }
-
-    }
-  );
-
-  ctx.stroke();
-}
-
-[
-  "perfAccount",
-  "perfStrategy",
-  "perfTF",
-  "perfSession",
-  "perfFrom",
-  "perfTo"
-].forEach(id=>{
-
-  if($(id)){
-
-    $(id).addEventListener(
-      "change",
-      renderPerformance
-    );
-
-  }
-
-});
-
-if($("perfReset")){
-
-  $("perfReset").onclick=()=>{
-
-    [
-      "perfAccount",
-      "perfStrategy",
-      "perfTF",
-      "perfSession",
-      "perfFrom",
-      "perfTo"
-    ].forEach(id=>{
-
-      if($(id)){
-
-        $(id).value="";
-
-      }
-
-    });
-
-    renderPerformance();
-
-  };
-
-}
-
-/* =========================================================
-   ACCOUNTS
-========================================================= */
-
-async function loadAccounts(){
-
-  if(!currentUser)return;
-
-  const {
-    data,
-    error
-  } =
-    await sb
-      .from("prop_accounts")
-      .select("*")
-      .eq(
-        "user_id",
-        currentUser.id
-      )
-      .order(
-        "created_at",
-        {
-          ascending:false
-        }
-      );
-
-  if(!error){
-
-    accounts=
-      data || [];
-
-  }else{
-
-    console.error(error);
-
-  }
-
-  renderAccounts();
-
-  renderGlobal();
-
-  fillPayoutAccounts();
-
-  fillTradeAccounts();
-
-  renderCalendar();
-
-  setupPerfFilters();
-
-  renderPerformance();
-}
-
-async function loadPayouts(){
-
-  if(!currentUser)return;
-
-  const {
-    data,
-    error
-  } =
-    await sb
-      .from("payouts")
-      .select("*")
-      .eq(
-        "user_id",
-        currentUser.id
-      )
-      .order(
-        "payout_date",
-        {
-          ascending:false
-        }
-      );
-
-  if(!error){
-
-    payouts=
-      data || [];
-
-  }else{
-
-    console.error(error);
-
-  }
-
-  renderPayouts();
-
-  renderGlobal();
-}
-
-function renderAccounts(){
-
-  const box=
-    $("accountList");
-
-  if(!box)return;
-
-  box.innerHTML=
-    accounts
-      .map(a=>{
-
-        const ats=
-          trades.filter(
-            t=>
-              t.account_id===a.id
-          );
-
-        const pl=
-          ats.reduce(
-            (s,t)=>
-              s+
-              Number(t.pl||0),
-            0
-          );
-
-        const paid=
-          payouts
-            .filter(
-              p=>
-                p.account_id===a.id &&
-                p.status==="Paid"
-            )
-            .reduce(
-              (s,p)=>
-                s+
-                Number(p.amount||0),
-              0
-            );
-
-        const target=
-          Number(
-            a.account_size
-          )*
-          Number(
-            a.target_pct
-          )/
-          100;
-
-        const progress=
-          target
-            ?Math.max(
-              0,
-              pl/target*100
-            )
-            :0;
-
-        const consistency=
-          getAccountConsistency(
-            a.id
-          );
-
-        const rule=
-          Number(
-            a.consistency_pct||0
-          );
-
-        const consistencyClass=
-          ats.length
-            ?(
-              !rule ||
-              consistency<=rule
-                ?"positive"
-                :"negative"
-            )
-            :"neutralValue";
-
-        const statusClass=
-          (a.status||"")
-            .toLowerCase()
-            .replace(
-              /\s+/g,
-              ""
-            );
-
-        return `
-        <div class="panel accountCard">
-
-          <div class="accountTop">
-
-            <div>
-
-              <h2>
-                ${esc(a.firm)}
-              </h2>
-
-              <small>
-                ${esc(a.account_name)}
-              </small>
-
-            </div>
-
-            <span class="status ${statusClass}">
-              ${esc(a.status)}
-            </span>
-
-          </div>
-
-          <div class="accountMetrics">
-
-            <div>
-              <small>Size</small>
-              <b>
-                ${money(a.account_size)}
-              </b>
-            </div>
-
-            <div>
-              <small>Fee</small>
-              <b class="negative">
-                ${money(
-                  -Number(
-                    a.purchase_fee||0
-                  )
-                )}
-              </b>
-            </div>
-
-            <div>
-              <small>Trading P/L</small>
-              <b class="${
-                pl>=0
-                  ?"positive"
-                  :"negative"
-              }">
-                ${money(pl)}
-              </b>
-            </div>
-
-            <div>
-              <small>Payout</small>
-              <b class="${
-                paid>0
-                  ?"positive"
-                  :""
-              }">
-                ${money(paid)}
-              </b>
-            </div>
-
-            <div>
-              <small>Consistency</small>
-              <b class="${consistencyClass}">
-                ${
-                  ats.length
-                    ?consistency.toFixed(1)+"%"
-                    :"—"
-                }
-              </b>
-            </div>
-
-            <div>
-              <small>Rule</small>
-              <b>
-                ${
-                  rule
-                    ?rule+"%"
-                    :"—"
-                }
-              </b>
-            </div>
-
-          </div>
-
-          <div class="progress">
-
-            <i
-              style="width:${Math.min(
-                100,
-                Math.max(
-                  0,
-                  progress
-                )
-              )}%">
-            </i>
-
-          </div>
-
-          <div class="accountRuleLine">
-
-            <span>
-              Target
-              ${Number(a.target_pct)}%
-            </span>
-
-            <span>
-              Max DD
-              ${Number(a.max_dd_pct)}%
-            </span>
-
-            <span>
-              Daily
-              ${Number(a.daily_loss_pct)}%
-            </span>
-
-            <span>
-              Consistency
-              ${rule}%
-            </span>
-
-          </div>
-
-          <div class="accountActions">
-
-            <button
-              class="secondary"
-              onclick="
-                editAccount('${a.id}')
-              ">
-              ✏️ Edit Account
-            </button>
-
-            <button
-              class="secondary"
-              onclick="
-                setAccountStatus('${a.id}')
-              ">
-              Ubah Status
-            </button>
-
-            <button
-              class="danger"
-              onclick="
-                deleteAccount('${a.id}')
-              ">
-              Hapus
-            </button>
-
-          </div>
-
-        </div>
-        `;
-
-      })
-      .join("")
-      ||
-      `
-      <div class="panel emptyState">
-
-        <strong>
-          Belum ada akun Prop Firm
-        </strong>
-
-        <p class="muted">
-          Tambahkan akun pertama untuk mulai
-          melacak biaya, trade, payout,
-          dan consistency.
-        </p>
-
-        <button
-          onclick="
-            document
-              .getElementById(
-                'addAccountBtn'
-              )
-              .click()
-          ">
-          + Tambah Akun
-        </button>
-
-      </div>
-      `;
-}
-
-async function setAccountStatus(id){
-
-  if(!currentUser){
-
-    showAdminLogin();
-
-    return;
-
-  }
-
-  const a=
-    accounts.find(
-      x=>x.id===id
-    );
-
-  if(!a)return;
-
-  const status=
-    prompt(
-      "Status baru: Phase 1, Phase 2, Funded, Payout, Failed, Closed",
-      a.status
-    );
-
-  if(!status)return;
-
-  const {
-    error
-  } =
-    await sb
-      .from("prop_accounts")
-      .update({
-        status
-      })
-      .eq(
-        "id",
-        id
-      )
-      .eq(
-        "user_id",
-        currentUser.id
-      );
-
-  if(error){
-
-    alert(
-      error.message
-    );
-
-  }else{
-
-    loadAccounts();
-
-  }
-}
-
-async function deleteAccount(id){
-
-  if(!currentUser){
-
-    showAdminLogin();
-
-    return;
-
-  }
-
-  if(
-    !confirm(
-      "Hapus akun beserta data terkait?"
-    )
-  )return;
-
-  const {
-    error
-  } =
-    await sb
-      .from("prop_accounts")
-      .delete()
-      .eq(
-        "id",
-        id
-      )
-      .eq(
-        "user_id",
-        currentUser.id
-      );
-
-  if(error){
-
-    alert(
-      error.message
-    );
-
-  }else{
-
-    await loadAccounts();
-
-    await loadPayouts();
-
-  }
-}
-
-/* =========================================================
-   PAYOUT
-========================================================= */
-
-function renderPayouts(){
-
-  const box=
-    $("payoutList");
-
-  if(!box)return;
-
-  box.innerHTML=
-    payouts
-      .map(p=>{
-
-        const a=
-          accounts.find(
-            x=>
-              x.id===p.account_id
-          );
-
-        return `
-        <div class="trade">
-
-          <div>
-
-            <b>
-              ${money(p.amount)}
-            </b>
-
-            <span class="pill">
-              ${esc(p.status)}
-            </span>
-
-          </div>
-
-          <small>
-            ${esc(a?.firm||"")}
-            ·
-            ${esc(a?.account_name||"")}
-            ·
-            ${p.payout_date}
-          </small>
-
-          <small>
-            ${esc(p.note||"")}
-          </small>
-
-        </div>
-        `;
-
-      })
-      .join("")
-      ||
-      '<p class="muted">Belum ada payout.</p>';
-}
-
-function fillTradeAccounts(){
-
-  const s=
-    $("tAccount");
-
-  if(!s)return;
-
-  s.innerHTML=
-    '<option value="">Pilih akun prop firm</option>'+
-    accounts
-      .map(
-        a=>
-          `<option value="${a.id}">
-            ${esc(a.firm)}
-            —
-            ${esc(a.account_name)}
-          </option>`
-      )
-      .join("");
-}
-
-function fillPayoutAccounts(){
-
-  const s=
-    $("pAccount");
-
-  if(!s)return;
-
-  s.innerHTML=
-    accounts
-      .map(
-        a=>
-          `<option value="${a.id}">
-            ${esc(a.firm)}
-            —
-            ${esc(a.account_name)}
-          </option>`
-      )
-      .join("");
-}
-
-function getAccountConsistency(
-  accountId
-){
-
-  const rows=
-    trades.filter(
-      t=>
-        t.account_id===accountId
-    );
-
-  const daily={};
-
-  rows.forEach(t=>{
-
-    const d=
-      new Date(
-        t.trade_date
-      )
-      .toISOString()
-      .slice(0,10);
-
-    daily[d]=
-      (daily[d]||0)+
-      Number(t.pl||0);
-
-  });
-
-  const total=
-    Object
-      .values(daily)
-      .reduce(
-        (s,v)=>s+v,
-        0
-      );
-
-  const positiveDays=
-    Object
-      .values(daily)
-      .filter(
-        v=>v>0
-      );
-
-  const best=
-    positiveDays.length
-      ?Math.max(
-        ...positiveDays
-      )
-      :0;
-
-  return total>0
-    ?best/total*100
-    :0;
-}
-
-/* =========================================================
-   GLOBAL
-========================================================= */
-
-function renderGlobal(){
-
-  if(!currentUser)return;
-
-  const fees=
-    accounts.reduce(
-      (s,a)=>
-        s+
-        Number(
-          a.purchase_fee||0
-        ),
-      0
-    );
-
-  const pays=
-    payouts
-      .filter(
-        p=>
-          p.status==="Paid"
-      )
-      .reduce(
-        (s,p)=>
-          s+
-          Number(
-            p.amount||0
-          ),
-        0
-      );
-
-  const vals=
-    trades.map(
-      t=>
-        Number(
-          t.pl||0
-        )
-    );
-
-  const pl=
-    vals.reduce(
-      (s,v)=>s+v,
-      0
-    );
-
-  const wins=
-    vals.filter(
-      v=>v>0
-    );
-
-  const losses=
-    vals.filter(
-      v=>v<0
-    );
-
-  const grossW=
-    wins.reduce(
-      (s,v)=>s+v,
-      0
-    );
-
-  const grossL=
-    Math.abs(
-      losses.reduce(
-        (s,v)=>s+v,
-        0
-      )
-    );
-
-  const wr=
-    vals.length
-      ?wins.length/
-       vals.length*100
-      :0;
-
-  const pf=
-    grossL
-      ?grossW/grossL
-      :0;
-
-  const netCash=
-    pays-fees;
-
-  const roi=
-    fees
-      ?netCash/fees*100
-      :0;
-
-  const countStatus=
-    s=>
-      accounts.filter(
-        a=>
-          (a.status||"")
-            .toLowerCase()
-            .replace(
-              /\s+/g,
-              " "
-            )
-            ===s
-      ).length;
-
-  [
-    [
-      "gTradingPL",
-      money(pl)
-    ],
-    [
-      "gWinRate",
-      wr.toFixed(1)+"%"
-    ],
-    [
-      "gTradeCount",
-      vals.length
-    ],
-    [
-      "gProfitFactor",
-      pf.toFixed(2)
-    ],
-    [
-      "gFees",
-      money(-fees)
-    ],
-    [
-      "gPayouts",
-      money(pays)
-    ],
-    [
-      "gNet",
-      money(netCash)
-    ],
-    [
-      "gCashROI",
-      roi.toFixed(1)+"%"
-    ],
-    [
-      "gAccounts",
-      accounts.length
-    ],
-    [
-      "gPhase1",
-      countStatus("phase 1")
-    ],
-    [
-      "gPhase2",
-      countStatus("phase 2")
-    ],
-    [
-      "gFunded",
-      countStatus("funded")
-    ]
-
-  ].forEach(
-    ([id,v])=>{
-
-      if($(id)){
-
-        $(id)
-          .textContent=v;
-
-      }
-
-    }
-  );
-
-  setValueClass(
-    "gTradingPL",
-    pl
-  );
-
-  setValueClass(
-    "gNet",
-    netCash
-  );
-
-  setValueClass(
-    "gFees",
-    -fees
-  );
-
-  setValueClass(
-    "gPayouts",
-    pays
-  );
-
-  setValueClass(
-    "gCashROI",
-    roi
-  );
-
-  setValueClass(
-    "gWinRate",
-    wr,
-    "winrate"
-  );
-
-  setValueClass(
-    "gProfitFactor",
-    pf
-  );
-
-  const todayKey=
-    new Date()
-      .toISOString()
-      .slice(0,10);
-
-  const daily={};
-
-  trades.forEach(t=>{
-
-    const d=
-      new Date(
-        t.trade_date
-      )
-      .toISOString()
-      .slice(0,10);
-
-    daily[d]=
-      (daily[d]||0)+
-      Number(t.pl||0);
-
-  });
-
-  const todayPL=
-    daily[todayKey]||0;
-
-  const dayVals=
-    Object.values(
-      daily
-    );
-
-  const bestDay=
-    dayVals.length
-      ?Math.max(
-        ...dayVals
-      )
-      :0;
-
-  const worstDay=
-    dayVals.length
-      ?Math.min(
-        ...dayVals
-      )
-      :0;
-
-  const riskCount=
-    accounts.filter(
-      a=>{
-
-        const c=
-          getAccountConsistency(
-            a.id
-          );
-
-        const r=
-          Number(
-            a.consistency_pct||0
-          );
-
-        return(
-          r>0 &&
-          c>r
-        );
-
-      }
-    ).length;
-
-  [
-    [
-      "gTodayPL",
-      money(todayPL)
-    ],
-    [
-      "gBestDay",
-      money(bestDay)
-    ],
-    [
-      "gWorstDay",
-      money(worstDay)
-    ],
-    [
-      "gRiskAccounts",
-      riskCount
-    ]
-
-  ].forEach(
-    ([id,v])=>{
-
-      if($(id)){
-
-        $(id)
-          .textContent=v;
-
-      }
-
-    }
-  );
-
-  setValueClass(
-    "gTodayPL",
-    todayPL
-  );
-
-  setValueClass(
-    "gBestDay",
-    bestDay
-  );
-
-  setValueClass(
-    "gWorstDay",
-    worstDay
-  );
-
-  const list=
-    $("globalAccountList");
-
-  if(list){
-
-    list.innerHTML=
-      accounts
-        .map(a=>{
-
-          const st=
-            a.status||
-            "Phase 1";
-
-          const plA=
-            trades
-              .filter(
-                t=>
-                  t.account_id===a.id
-              )
-              .reduce(
-                (s,t)=>
-                  s+
-                  Number(
-                    t.pl||0
-                  ),
-                0
-              );
-
-          const paid=
-            payouts
-              .filter(
-                p=>
-                  p.account_id===a.id &&
-                  p.status==="Paid"
-              )
-              .reduce(
-                (s,p)=>
-                  s+
-                  Number(
-                    p.amount||0
-                  ),
-                0
-              );
-
-          const currentConsistency=
-            getAccountConsistency(
-              a.id
-            );
-
-          const rule=
-            Number(
-              a.consistency_pct||0
-            );
-
-          const consistencyClass=
-            rule>0
-              ?(
-                currentConsistency<=rule
-                  ?"positive"
-                  :"negative"
-              )
-              :"muted";
-
-          return `
-          <div class="globalAccountRow">
-
-            <div>
-
-              <b>
-                ${esc(a.firm)}
-                —
-                ${esc(a.account_name)}
-              </b>
-
-              <span class="dashStatus">
-                ${esc(st)}
-              </span>
-
-            </div>
-
-            <div class="accountOverviewStats">
-
-              <small>
-                P/L ${money(plA)}
-                ·
-                Payout ${money(paid)}
-              </small>
-
-              <span
-                class="consistencyBadge ${consistencyClass}">
-
-                Consistency
-                ${currentConsistency.toFixed(1)}%
-
-                ${
-                  rule
-                    ?` / Rule ${rule}%`
-                    :""
-                }
-
-              </span>
-
-            </div>
-
-          </div>
-          `;
-
-        })
-        .join("")
-        ||
-        '<p class="muted">Belum ada akun Prop Firm.</p>';
-
-  }
-
-  drawGlobalEquity();
-}
-
-function drawGlobalEquity(){
-
-  const c=
-    $("globalEquityChart");
-
-  if(!c)return;
-
-  const ts=
-    [...trades]
-      .sort(
-        (a,b)=>
-          new Date(a.trade_date)-
-          new Date(b.trade_date)
-      );
-
-  const ctx=
-    c.getContext("2d");
-
-  const w=
-    c.width=
-      c.clientWidth*2;
-
-  const h=
-    c.height=
-      250*2;
-
-  ctx.clearRect(
-    0,
-    0,
-    w,
-    h
-  );
-
-  if(!ts.length){
-
-    if($("gEquityLabel")){
-
-      $("gEquityLabel")
-        .textContent=
-          "$0.00";
-
-    }
-
-    return;
-
-  }
-
-  let eq=0;
-
-  const pts=[0];
-
-  ts.forEach(t=>{
-
-    eq+=
-      Number(
-        t.pl||0
-      );
-
-    pts.push(eq);
-
-  });
-
-  if($("gEquityLabel")){
-
-    $("gEquityLabel")
-      .textContent=
-        money(eq);
-
-  }
-
-  let min=
-    Math.min(
-      ...pts,
-      0
-    );
-
-  let max=
-    Math.max(
-      ...pts,
-      0
-    );
-
-  if(min===max){
-
-    min-=1;
-    max+=1;
-
-  }
-
-  const X=
-    i=>
-      i/
-      (pts.length-1)*
+  pts.forEach((v, i) => {
+
+    const x =
+      i /
+      (pts.length - 1) *
       w;
 
-  const Y=
-    v=>
-      h-
-      (v-min)/
-      (max-min)*
+    const y =
+      h -
+      (v - min) /
+      (max - min) *
       h;
 
-  const zero=
-    Y(0);
+    if (i === 0)
+      ctx.moveTo(x, y);
+    else
+      ctx.lineTo(x, y);
 
-  const area=
-    ctx.createLinearGradient(
-      0,
-      0,
-      0,
-      h
-    );
+  });
 
-  area.addColorStop(
-    0,
-    "rgba(63,185,80,.18)"
-  );
+  ctx.strokeStyle =
+    "#58a6ff";
 
-  area.addColorStop(
-    .55,
-    "rgba(63,185,80,.04)"
-  );
-
-  area.addColorStop(
-    1,
-    "rgba(248,81,73,.08)"
-  );
-
-  ctx.beginPath();
-
-  pts.forEach(
-    (v,i)=>
-      i
-        ?ctx.lineTo(
-          X(i),
-          Y(v)
-        )
-        :ctx.moveTo(
-          X(i),
-          Y(v)
-        )
-  );
-
-  ctx.lineTo(
-    w,
-    h
-  );
-
-  ctx.lineTo(
-    0,
-    h
-  );
-
-  ctx.closePath();
-
-  ctx.fillStyle=area;
-
-  ctx.fill();
-
-  ctx.beginPath();
-
-  ctx.moveTo(
-    0,
-    zero
-  );
-
-  ctx.lineTo(
-    w,
-    zero
-  );
-
-  ctx.strokeStyle=
-    "rgba(139,148,158,.35)";
-
-  ctx.lineWidth=2;
+  ctx.lineWidth = 5;
 
   ctx.stroke();
-
-  for(
-    let i=1;
-    i<pts.length;
-    i++
-  ){
-
-    ctx.beginPath();
-
-    ctx.moveTo(
-      X(i-1),
-      Y(pts[i-1])
-    );
-
-    ctx.lineTo(
-      X(i),
-      Y(pts[i])
-    );
-
-    ctx.lineWidth=5;
-
-    ctx.strokeStyle=
-      pts[i]>=pts[i-1]
-        ?" #3fb950".trim()
-        :"#f85149";
-
-    ctx.lineCap=
-      "round";
-
-    ctx.stroke();
-
-  }
 }
 
 /* =========================================================
    CALENDAR
-========================================================= */
+   ========================================================= */
 
-function renderCalendar(){
+function renderCalendar() {
 
-  const box=
+  const box =
     $("calendarGrid");
 
-  if(!box)return;
+  if (!box) return;
 
-  const now=
-    new Date(
-      calendarCursor
-    );
+  const now =
+    new Date(calendarCursor);
 
-  const y=
+  const y =
     now.getFullYear();
 
-  const m=
+  const m =
     now.getMonth();
 
-  const first=
+  const first =
     new Date(
       y,
       m,
       1
     ).getDay();
 
-  const days=
+  const days =
     new Date(
       y,
-      m+1,
+      m + 1,
       0
     ).getDate();
 
-  const monthTitle=
+  let title =
     now.toLocaleDateString(
       "id-ID",
       {
-        month:"long",
-        year:"numeric"
+        month: "long",
+        year: "numeric"
       }
     );
 
-  if($("calTitle")){
+  if ($("calTitle")) {
 
     $("calTitle")
-      .textContent=
-        monthTitle
-          .charAt(0)
-          .toUpperCase()+
-        monthTitle.slice(1);
+      .textContent =
+      title.charAt(0).toUpperCase() +
+      title.slice(1);
 
   }
 
-  const names=[
+  const names = [
     "Min",
     "Sen",
     "Sel",
@@ -3162,88 +2922,91 @@ function renderCalendar(){
     "Sab"
   ];
 
-  let h=
+  let html =
     names
       .map(
-        n=>
+        n =>
           `<div class="calHead">
             ${n}
           </div>`
       )
       .join("");
 
-  for(
-    let i=0;
-    i<first;
+  for (
+    let i = 0;
+    i < first;
     i++
-  ){
+  ) {
 
-    h+=
-      '<div class="calEmpty"></div>';
+    html +=
+      `<div class="calEmpty"></div>`;
 
   }
 
-  for(
-    let d=1;
-    d<=days;
+  for (
+    let d = 1;
+    d <= days;
     d++
-  ){
+  ) {
 
-    const dt=
+    const dt =
       new Date(
         y,
         m,
         d
       );
 
-    const key=
-      dt
-        .toISOString()
-        .slice(0,10);
+    const key =
+      dt.toISOString()
+        .slice(0, 10);
 
-    const dayPL=
+    const dayPL =
       trades
         .filter(
-          t=>
+          t =>
             new Date(
               t.trade_date
             )
-            .toISOString()
-            .slice(0,10)
-            ===key
+              .toISOString()
+              .slice(0, 10) === key
         )
         .reduce(
-          (s,t)=>
-            s+
-            Number(
-              t.pl||0
-            ),
+          (s, t) =>
+            s +
+            Number(t.pl || 0),
           0
         );
 
-    const today=
-      key===
+    const today =
+      key ===
       new Date()
         .toISOString()
-        .slice(0,10);
+        .slice(0, 10);
 
-    h+=`
+    html += `
       <button
         type="button"
-        class="
-          calDay
-          ${dayPL>0?"calWin":""}
-          ${dayPL<0?"calLoss":""}
-          ${today?"calToday":""}
-        "
+        class="calDay ${
+          dayPL > 0
+            ? "calWin"
+            : dayPL < 0
+              ? "calLoss"
+              : ""
+        } ${
+          today
+            ? "calToday"
+            : ""
+        }"
         data-date="${key}">
 
         <b>${d}</b>
 
         <small>
-          ${dayPL
-            ?money(dayPL)
-            :"—"}
+          ${
+            dayPL
+              ? money(dayPL)
+              : "—"
+          }
         </small>
 
       </button>
@@ -3251,180 +3014,93 @@ function renderCalendar(){
 
   }
 
-  box.innerHTML=h;
-}
-
-if($("calPrev")){
-
-  $("calPrev").onclick=()=>{
-
-    calendarCursor.setMonth(
-      calendarCursor.getMonth()-1
-    );
-
-    renderCalendar();
-
-  };
-
-}
-
-if($("calNext")){
-
-  $("calNext").onclick=()=>{
-
-    calendarCursor.setMonth(
-      calendarCursor.getMonth()+1
-    );
-
-    renderCalendar();
-
-  };
-
-}
-
-if($("calToday")){
-
-  $("calToday").onclick=()=>{
-
-    calendarCursor=
-      new Date();
-
-    renderCalendar();
-
-  };
-
+  box.innerHTML = html;
 }
 
 /* =========================================================
-   PAGE NAVIGATION
-========================================================= */
+   NAVIGATION
+   ========================================================= */
 
-function openPage(pageId){
+function openPage(pageId) {
 
-  if(
+  /*
+    Publik tidak boleh membuka
+    halaman admin walaupun mencoba
+    lewat URL / console.
+  */
+
+  if (
     !currentUser &&
     ![
       "journalPage",
       "performancePage",
       "calendarPage"
     ].includes(pageId)
-  ){
+  ) {
 
-    pageId=
-      "journalPage";
+    pageId = "journalPage";
 
   }
 
   document
     .querySelectorAll(".page")
     .forEach(
-      p=>
-        p.classList.add(
-          "hidden"
-        )
+      p =>
+        p.classList.add("hidden")
     );
 
   document
     .querySelectorAll(".navBtn")
     .forEach(
-      b=>
+      b =>
         b.classList.toggle(
           "active",
-          b.dataset.page===pageId
+          b.dataset.page === pageId
         )
     );
 
-  const page=
+  const page =
     $(pageId);
 
-  if(page){
-
-    page.classList.remove(
-      "hidden"
-    );
-
+  if (page) {
+    page.classList.remove("hidden");
   }
 
-  if(
-    pageId==="globalPage" &&
-    currentUser
-  ){
-
+  if (pageId === "globalPage")
     renderGlobal();
 
-    renderAccounts();
-
-  }
-
-  if(
-    pageId==="performancePage"
-  ){
-
-    setupPerfFilters();
-
+  if (pageId === "performancePage")
     renderPerformance();
 
-  }
-
-  if(
-    pageId==="accountsPage" &&
-    currentUser
-  ){
-
+  if (pageId === "accountsPage")
     renderAccounts();
 
-  }
-
-  if(
-    pageId==="payoutsPage" &&
-    currentUser
-  ){
-
+  if (pageId === "payoutsPage")
     renderPayouts();
 
-    fillPayoutAccounts();
-
-  }
-
-  if(
-    pageId==="calendarPage"
-  ){
-
+  if (pageId === "calendarPage")
     renderCalendar();
 
-  }
-
-  if(
-    pageId==="journalPage"
-  ){
-
-    render();
-
-  }
+  if (pageId === "journalPage")
+    renderJournal();
 
   window.scrollTo({
-    top:0,
-    behavior:"smooth"
+    top: 0,
+    behavior: "smooth"
   });
 }
 
-window.openPage=
+window.openPage =
   openPage;
-
-/* =========================================================
-   NAV / CALENDAR CLICK
-========================================================= */
 
 document.addEventListener(
   "click",
-  function(e){
+  e => {
 
-    const nav=
-      e.target.closest(
-        ".navBtn"
-      );
+    const nav =
+      e.target.closest(".navBtn");
 
-    if(nav){
+    if (nav) {
 
       e.preventDefault();
 
@@ -3436,31 +3112,23 @@ document.addEventListener(
 
     }
 
-    const day=
-      e.target.closest(
-        ".calDay"
-      );
+    const day =
+      e.target.closest(".calDay");
 
-    if(day){
+    if (day) {
 
       e.preventDefault();
 
-      const date=
+      const date =
         day.dataset.date;
 
-      if($("perfFrom")){
+      if ($("perfFrom"))
+        $("perfFrom").value =
+          date;
 
-        $("perfFrom")
-          .value=date;
-
-      }
-
-      if($("perfTo")){
-
-        $("perfTo")
-          .value=date;
-
-      }
+      if ($("perfTo"))
+        $("perfTo").value =
+          date;
 
       openPage(
         "performancePage"
@@ -3474,1133 +3142,345 @@ document.addEventListener(
 );
 
 /* =========================================================
-   ACCOUNT MODAL
-========================================================= */
+   SEARCH
+   ========================================================= */
 
-if($("addAccountBtn")){
+if ($("search")) {
 
-  $("addAccountBtn").onclick=()=>{
-
-    if(!currentUser){
-
-      showAdminLogin();
-
-      return;
-
-    }
-
-    editingAccountId=
-      null;
-
-    $("accountForm")
-      .reset();
-
-    $("accountModalTitle")
-      .textContent=
-        "Tambah Prop Firm Account";
-
-    $("accountSubmitBtn")
-      .textContent=
-        "Simpan Akun";
-
-    $("aStatus")
-      .value=
-        "Phase 1";
-
-    $("aTarget")
-      .value=6;
-
-    $("aMaxDD")
-      .value=4;
-
-    $("aDaily")
-      .value=2;
-
-    $("aConsistency")
-      .value=20;
-
-    show(
-      "accountModal",
-      true
-    );
-
-  };
+  $("search").oninput =
+    renderJournal;
 
 }
 
-if($("closeAccountModal")){
+/* =========================================================
+   CALENDAR BUTTONS
+   ========================================================= */
 
-  $("closeAccountModal")
-    .onclick=()=>{
+if ($("calPrev")) {
 
-      editingAccountId=
-        null;
+  $("calPrev").onclick =
+    () => {
 
-      show(
-        "accountModal",
-        false
+      calendarCursor.setMonth(
+        calendarCursor.getMonth() - 1
       );
+
+      renderCalendar();
 
     };
 
 }
 
-if($("addPayoutBtn")){
+if ($("calNext")) {
 
-  $("addPayoutBtn")
-    .onclick=()=>{
+  $("calNext").onclick =
+    () => {
 
-      if(!currentUser){
+      calendarCursor.setMonth(
+        calendarCursor.getMonth() + 1
+      );
 
+      renderCalendar();
+
+    };
+
+}
+
+if ($("calToday")) {
+
+  $("calToday").onclick =
+    () => {
+
+      calendarCursor =
+        new Date();
+
+      renderCalendar();
+
+    };
+
+}
+
+/* =========================================================
+   PERFORMANCE FILTERS
+   ========================================================= */
+
+[
+  "perfAccount",
+  "perfStrategy",
+  "perfTF",
+  "perfSession",
+  "perfFrom",
+  "perfTo"
+].forEach(id => {
+
+  if ($(id)) {
+
+    $(id).addEventListener(
+      "change",
+      renderPerformance
+    );
+
+  }
+
+});
+
+if ($("perfReset")) {
+
+  $("perfReset").onclick =
+    () => {
+
+      [
+        "perfAccount",
+        "perfStrategy",
+        "perfTF",
+        "perfSession",
+        "perfFrom",
+        "perfTo"
+      ].forEach(id => {
+
+        if ($(id))
+          $(id).value = "";
+
+      });
+
+      renderPerformance();
+
+    };
+
+}
+
+/* =========================================================
+   EXPORT CSV
+   ========================================================= */
+
+if ($("exportBtn")) {
+
+  $("exportBtn").onclick =
+    () => {
+
+      if (!currentUser) {
         showAdminLogin();
-
         return;
-
       }
 
-      fillPayoutAccounts();
+      const headers = [
+        "date",
+        "symbol",
+        "side",
+        "entry",
+        "exit",
+        "risk",
+        "pl",
+        "strategy",
+        "timeframe",
+        "session",
+        "notes"
+      ];
 
-      show(
-        "payoutModal",
-        true
-      );
-
-    };
-
-}
-
-if($("closePayoutModal")){
-
-  $("closePayoutModal")
-    .onclick=()=>{
-
-      show(
-        "payoutModal",
-        false
-      );
-
-    };
-
-}
-
-/* =========================================================
-   EDIT ACCOUNT
-========================================================= */
-
-async function editAccount(id){
-
-  if(!currentUser){
-
-    showAdminLogin();
-
-    return;
-
-  }
-
-  const a=
-    accounts.find(
-      x=>x.id===id
-    );
-
-  if(!a)return;
-
-  editingAccountId=
-    id;
-
-  $("aFirm")
-    .value=
-      a.firm||"";
-
-  $("aName")
-    .value=
-      a.account_name||"";
-
-  $("aSize")
-    .value=
-      a.account_size??0;
-
-  $("aFee")
-    .value=
-      a.purchase_fee??0;
-
-  $("aStatus")
-    .value=
-      a.status||
-      "Phase 1";
-
-  $("aTarget")
-    .value=
-      a.target_pct??6;
-
-  $("aMaxDD")
-    .value=
-      a.max_dd_pct??4;
-
-  $("aDaily")
-    .value=
-      a.daily_loss_pct??2;
-
-  $("aConsistency")
-    .value=
-      a.consistency_pct??20;
-
-  $("aStart")
-    .value=
-      a.start_date||"";
-
-  $("aNotes")
-    .value=
-      a.notes||"";
-
-  $("accountModalTitle")
-    .textContent=
-      "Edit Prop Firm Account";
-
-  $("accountSubmitBtn")
-    .textContent=
-      "Update Account";
-
-  $("accountMsg")
-    .textContent="";
-
-  show(
-    "accountModal",
-    true
-  );
-}
-
-window.editAccount=
-  editAccount;
-
-/* =========================================================
-   ACCOUNT FORM
-========================================================= */
-
-if($("accountForm")){
-
-  $("accountForm")
-    .onsubmit=
-      async e=>{
-
-        e.preventDefault();
-
-        if(!currentUser){
-
-          showAdminLogin();
-
-          return;
-
-        }
-
-        $("accountMsg")
-          .textContent=
-            "Menyimpan...";
-
-        const n=
-          id=>
-            parseFloat(
-              $(id).value
-            )||0;
-
-        const row={
-
-          firm:
-            $("aFirm")
-              .value
-              .trim(),
-
-          account_name:
-            $("aName")
-              .value
-              .trim(),
-
-          account_size:
-            n("aSize"),
-
-          purchase_fee:
-            n("aFee"),
-
-          status:
-            $("aStatus")
-              .value,
-
-          target_pct:
-            n("aTarget"),
-
-          max_dd_pct:
-            n("aMaxDD"),
-
-          daily_loss_pct:
-            n("aDaily"),
-
-          consistency_pct:
-            n("aConsistency"),
-
-          start_date:
-            $("aStart")
-              .value ||
-            null,
-
-          notes:
-            $("aNotes")
-              .value
-              .trim()
-
-        };
-
-        let result;
-
-        if(editingAccountId){
-
-          result=
-            await sb
-              .from(
-                "prop_accounts"
+      const rows =
+        trades.map(
+          t =>
+            headers
+              .map(
+                h =>
+                  `"${String(
+                    h === "date"
+                      ? t.trade_date
+                      : t[h] ?? ""
+                  ).replaceAll(
+                    '"',
+                    '""'
+                  )}"`
               )
-              .update(row)
-              .eq(
-                "id",
-                editingAccountId
-              )
-              .eq(
-                "user_id",
-                currentUser.id
-              );
-
-        }else{
-
-          result=
-            await sb
-              .from(
-                "prop_accounts"
-              )
-              .insert({
-                ...row,
-                user_id:
-                  currentUser.id
-              });
-
-        }
-
-        if(result.error){
-
-          $("accountMsg")
-            .textContent=
-              result.error.message;
-
-          return;
-
-        }
-
-        e.target.reset();
-
-        editingAccountId=
-          null;
-
-        show(
-          "accountModal",
-          false
+              .join(",")
         );
 
-        await loadAccounts();
-
-      };
-
-}
-
-/* =========================================================
-   PAYOUT FORM
-========================================================= */
-
-if($("payoutForm")){
-
-  $("payoutForm")
-    .onsubmit=
-      async e=>{
-
-        e.preventDefault();
-
-        if(!currentUser){
-
-          showAdminLogin();
-
-          return;
-
-        }
-
-        const row={
-
-          user_id:
-            currentUser.id,
-
-          account_id:
-            $("pAccount")
-              .value,
-
-          amount:
-            parseFloat(
-              $("pAmount")
-                .value
-            )||0,
-
-          payout_date:
-            $("pDate")
-              .value,
-
-          status:
-            $("pStatus")
-              .value,
-
-          note:
-            $("pNote")
-              .value
-              .trim()
-
-        };
-
-        const {
-          error
-        } =
-          await sb
-            .from(
-              "payouts"
-            )
-            .insert(row);
-
-        if(error){
-
-          $("payoutMsg")
-            .textContent=
-              error.message;
-
-          return;
-
-        }
-
-        e.target.reset();
-
-        show(
-          "payoutModal",
-          false
-        );
-
-        await loadPayouts();
-
-      };
-
-}
-
-/* =========================================================
-   LOAD ADMIN TRADES
-========================================================= */
-
-async function loadTrades(){
-
-  if(!currentUser)return;
-
-  const {
-    data,
-    error
-  } =
-    await sb
-      .from("trades")
-      .select("*")
-      .eq(
-        "user_id",
-        currentUser.id
-      )
-      .order(
-        "trade_date",
-        {
-          ascending:true
-        }
-      );
-
-  if(error){
-
-    console.error(error);
-
-    return;
-
-  }
-
-  trades=
-    data || [];
-
-  render();
-
-  renderProp();
-
-  renderGlobal();
-
-  renderCalendar();
-
-  setupPerfFilters();
-
-  renderPerformance();
-}
-
-/* =========================================================
-   JOURNAL
-========================================================= */
-
-function render(){
-
-  const total=
-    trades.length;
-
-  const wins=
-    trades.filter(
-      t=>Number(t.pl)>0
-    );
-
-  const losses=
-    trades.filter(
-      t=>Number(t.pl)<0
-    );
-
-  const net=
-    trades.reduce(
-      (a,t)=>
-        a+
-        Number(
-          t.pl||0
-        ),
-      0
-    );
-
-  const grossWin=
-    wins.reduce(
-      (a,t)=>
-        a+
-        Number(t.pl),
-      0
-    );
-
-  const grossLoss=
-    Math.abs(
-      losses.reduce(
-        (a,t)=>
-          a+
-          Number(t.pl),
-        0
-      )
-    );
-
-  const wr=
-    total
-      ?wins.length/
-       total*100
-      :0;
-
-  if($("totalTrades"))
-    $("totalTrades")
-      .textContent=
-        total;
-
-  if($("winRate"))
-    $("winRate")
-      .textContent=
-        wr.toFixed(1)+"%";
-
-  if($("netPL"))
-    $("netPL")
-      .textContent=
-        money(net);
-
-  if($("profitFactor"))
-    $("profitFactor")
-      .textContent=
-        grossLoss
-          ?(
-            grossWin/
-            grossLoss
-          ).toFixed(2)
-          :grossWin
-            ?"∞"
-            :"0.00";
-
-  setValueClass(
-    "winRate",
-    wr,
-    "winrate"
-  );
-
-  setValueClass(
-    "netPL",
-    net
-  );
-
-  setValueClass(
-    "profitFactor",
-    grossLoss
-      ?grossWin/grossLoss
-      :(grossWin
-        ?Infinity
-        :0)
-  );
-
-  const eq=[];
-
-  let e=0;
-
-  let peak=0;
-
-  let dd=0;
-
-  trades.forEach(t=>{
-
-    e+=
-      Number(
-        t.pl||0
-      );
-
-    peak=
-      Math.max(
-        peak,
-        e
-      );
-
-    dd=
-      Math.max(
-        dd,
-        peak-e
-      );
-
-    eq.push(e);
-
-  });
-
-  if($("maxDD"))
-    $("maxDD")
-      .textContent=
-        money(-dd);
-
-  if($("equityLabel"))
-    $("equityLabel")
-      .textContent=
-        money(e);
-
-  setValueClass(
-    "maxDD",
-    -dd
-  );
-
-  setValueClass(
-    "equityLabel",
-    e
-  );
-
-  const days={};
-
-  trades.forEach(t=>{
-
-    const d=
-      new Date(
-        t.trade_date
-      )
-      .toISOString()
-      .slice(0,10);
-
-    days[d]=
-      (days[d]||0)+
-      Number(
-        t.pl||0
-      );
-
-  });
-
-  const bestDay=
-    Math.max(
-      0,
-      ...Object.values(
-        days
-      )
-    );
-
-  if($("bestDay"))
-    $("bestDay")
-      .textContent=
-        money(bestDay);
-
-  setValueClass(
-    "bestDay",
-    bestDay
-  );
-
-  const q=
-    $("search")
-      ?$("search")
-        .value
-        .toLowerCase()
-      :"";
-
-  const filtered=
-    trades.filter(
-      t=>
-        (
-          t.symbol+
-          " "+
-          (t.strategy||"")+
-          " "+
-          (t.session||"")
-        )
-        .toLowerCase()
-        .includes(q)
-    );
-
-  if($("tradeList")){
-
-    $("tradeList")
-      .innerHTML=
-        filtered
-          .slice()
-          .reverse()
-          .map(
-            t=>
-              `
-              <div class="trade">
-
-                <div>
-
-                  <b>
-                    ${esc(t.symbol)}
-                  </b>
-
-                  <span class="pill">
-                    ${esc(t.side)}
-                  </span>
-
-                  <small>
-                    ${
-                      new Date(
-                        t.trade_date
-                      )
-                      .toLocaleString()
-                    }
-                  </small>
-
-                </div>
-
-                <div>
-
-                  <b class="${
-                    Number(t.pl)>=0
-                      ?"positive"
-                      :"negative"
-                  }">
-
-                    ${money(t.pl)}
-
-                  </b>
-
-                  ${
-                    currentUser
-                      ?`
-                        <button
-                          class="danger"
-                          onclick="
-                            deleteTrade('${t.id}')
-                          ">
-                          Hapus
-                        </button>
-                      `
-                      :""
-                  }
-
-                </div>
-
-                <small>
-                  ${esc(
-                    t.strategy||""
-                  )}
-
-                  ${esc(
-                    t.timeframe||""
-                  )}
-
-                  ${esc(
-                    t.session||""
-                  )}
-
-                </small>
-
-              </div>
-              `
-          )
-          .join("")
-          ||
-          `
-          <p class="muted">
-            Belum ada trade.
-          </p>
-          `;
-
-  }
-
-  draw(eq);
-}
-
-if($("search")){
-
-  $("search")
-    .oninput=
-      render;
-
-}
-
-/* =========================================================
-   DELETE TRADE
-========================================================= */
-
-async function deleteTrade(id){
-
-  if(!currentUser){
-
-    showAdminLogin();
-
-    return;
-
-  }
-
-  if(
-    !confirm(
-      "Hapus trade ini?"
-    )
-  )return;
-
-  const {
-    error
-  } =
-    await sb
-      .from("trades")
-      .delete()
-      .eq(
-        "id",
-        id
-      )
-      .eq(
-        "user_id",
-        currentUser.id
-      );
-
-  if(error){
-
-    alert(
-      error.message
-    );
-
-  }else{
-
-    await loadTrades();
-
-  }
-}
-
-window.deleteTrade=
-  deleteTrade;
-
-/* =========================================================
-   ESCAPE HTML
-========================================================= */
-
-function esc(v){
-
-  return String(
-    v ?? ""
-  )
-  .replace(
-    /[&<>"']/g,
-    m=>({
-
-      "&":"&amp;",
-      "<":"&lt;",
-      ">":"&gt;",
-      '"':"&quot;",
-      "'":"&#39;"
-
-    }[m])
-  );
-
-}
-
-/* =========================================================
-   EQUITY CHART
-========================================================= */
-
-function draw(data){
-
-  const c=
-    $("equityChart");
-
-  if(!c)return;
-
-  const dpr=
-    devicePixelRatio||1;
-
-  const w=
-    c.clientWidth||600;
-
-  const h=260;
-
-  c.width=
-    w*dpr;
-
-  c.height=
-    h*dpr;
-
-  const x=
-    c.getContext("2d");
-
-  x.scale(
-    dpr,
-    dpr
-  );
-
-  x.clearRect(
-    0,
-    0,
-    w,
-    h
-  );
-
-  x.strokeStyle=
-    "#27313d";
-
-  for(
-    let i=1;
-    i<4;
-    i++
-  ){
-
-    let y=
-      i*h/4;
-
-    x.beginPath();
-
-    x.moveTo(
-      0,
-      y
-    );
-
-    x.lineTo(
-      w,
-      y
-    );
-
-    x.stroke();
-
-  }
-
-  if(!data.length)return;
-
-  const min=
-    Math.min(
-      0,
-      ...data
-    );
-
-  const max=
-    Math.max(
-      0,
-      ...data
-    );
-
-  const range=
-    max-min||1;
-
-  x.beginPath();
-
-  data.forEach(
-    (v,i)=>{
-
-      let px=
-        data.length===1
-          ?w/2
-          :i/
-           (data.length-1)*
-           w;
-
-      let py=
-        h-
-        (v-min)/
-        range*
-        h*
-        .8-
-        10;
-
-      if(i){
-
-        x.lineTo(
-          px,
-          py
-        );
-
-      }else{
-
-        x.moveTo(
-          px,
-          py
-        );
-
-      }
-
-    }
-  );
-
-  x.strokeStyle=
-    "#27d39a";
-
-  x.lineWidth=3;
-
-  x.stroke();
-}
-
-/* =========================================================
-   EXPORT
-========================================================= */
-
-if($("exportBtn")){
-
-  $("exportBtn").onclick=()=>{
-
-    if(!currentUser){
-
-      showAdminLogin();
-
-      return;
-
-    }
-
-    const headers=[
-      "date",
-      "symbol",
-      "side",
-      "entry",
-      "exit",
-      "risk",
-      "pl",
-      "strategy",
-      "timeframe",
-      "session",
-      "notes"
-    ];
-
-    const rows=
-      trades.map(
-        t=>
-          headers
-            .map(
-              h=>
-                `"${String(
-                  h==="date"
-                    ?t.trade_date
-                    :t[h]??""
-                ).replaceAll(
-                  '"',
-                  '""'
-                )}"`
-            )
-            .join(",")
-      );
-
-    const blob=
-      new Blob(
-        [
+      const blob =
+        new Blob(
           [
-            headers.join(","),
-            ...rows
-          ].join("\n")
-        ],
-        {
-          type:
-            "text/csv"
-        }
+            [
+              headers.join(","),
+              ...rows
+            ].join("\n")
+          ],
+          {
+            type:
+              "text/csv"
+          }
+        );
+
+      const a =
+        document.createElement(
+          "a"
+        );
+
+      a.href =
+        URL.createObjectURL(
+          blob
+        );
+
+      a.download =
+        "inzakifx-trades.csv";
+
+      a.click();
+
+      URL.revokeObjectURL(
+        a.href
       );
 
-    const a=
-      document.createElement(
-        "a"
-      );
-
-    a.href=
-      URL.createObjectURL(
-        blob
-      );
-
-    a.download=
-      "inzakifx-trades.csv";
-
-    a.click();
-
-    URL.revokeObjectURL(
-      a.href
-    );
-
-  };
+    };
 
 }
 
 /* =========================================================
-   START APPLICATION
-========================================================= */
+   MODE BUTTON
+   ========================================================= */
+
+if ($("modeBtn")) {
+
+  $("modeBtn").onclick =
+    () => {
+
+      if (!currentUser) {
+        showAdminLogin();
+        return;
+      }
+
+      show(
+        "propPanel",
+        $("propPanel")
+          ?.classList.contains(
+            "hidden"
+          )
+      );
+
+      renderProp();
+
+    };
+
+}
+
+if ($("savePropBtn")) {
+  $("savePropBtn").onclick =
+    saveProp;
+}
+
+/* =========================================================
+   RENDER ALL
+   ========================================================= */
+
+function renderAll() {
+
+  renderJournal();
+  renderPerformance();
+  renderCalendar();
+  renderGlobal();
+  renderAccounts();
+  renderPayouts();
+
+  fillTradeAccounts();
+  fillPayoutAccounts();
+
+  if (currentUser) {
+    renderProp();
+  }
+
+}
+
+/* =========================================================
+   INIT
+   ========================================================= */
+
+async function init() {
+
+  setupAuth();
+  setupTradeForm();
+  setupAccountForm();
+  setupPayoutForm();
+
+  /*
+    Cek session admin.
+  */
+
+  const {
+    data: {
+      session
+    }
+  } =
+    await sb.auth.getSession();
+
+  if (session) {
+
+    await enterAdminUI(
+      session.user
+    );
+
+  } else {
+
+    /*
+      PENTING:
+      Tidak menampilkan Login.
+      Langsung View Only.
+    */
+
+    enterPublicUI();
+
+    await loadPublicData();
+
+  }
+
+  /*
+    Supabase Auth listener
+  */
+
+  sb.auth.onAuthStateChange(
+    async (_event, session) => {
+
+      if (session) {
+
+        await enterAdminUI(
+          session.user
+        );
+
+      } else {
+
+        enterPublicUI();
+
+        await loadPublicData();
+
+      }
+
+    }
+  );
+
+}
+
+/* =========================================================
+   START
+   ========================================================= */
 
 init();
 
 /* =========================================================
-   NAV BUTTONS
-========================================================= */
-
-document
-  .querySelectorAll(
-    ".navBtn"
-  )
-  .forEach(
-    btn=>{
-
-      btn.addEventListener(
-        "click",
-        e=>{
-
-          e.preventDefault();
-
-          openPage(
-            btn.dataset.page
-          );
-
-        }
-      );
-
-    }
-  );
-
-/* =========================================================
    RESIZE
-========================================================= */
+   ========================================================= */
 
 window.addEventListener(
   "resize",
-  ()=>{
+  () => {
 
-    if(
-      !$("appView")
-        ?.classList
-        .contains(
-          "hidden"
-        )
-    ){
-
-      if(currentUser){
-
-        drawGlobalEquity();
-
-      }
-
-      drawPerformanceChart(
-        getPerfTrades()
-      );
-
+    if (
+      !$("appView") ||
+      $("appView")
+        .classList
+        .contains("hidden")
+    ) {
+      return;
     }
+
+    renderGlobal();
+    renderJournal();
+    renderPerformance();
 
   }
 );
