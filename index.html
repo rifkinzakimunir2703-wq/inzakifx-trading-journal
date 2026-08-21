@@ -47,12 +47,10 @@
     <p class="muted">Simpan jurnal trading kamu secara online.</p>
     <div class="tabs">
       <button id="loginTab" class="active">Login</button>
-      <button id="registerTab">Register</button>
     </div>
     <form id="authForm">
       <input id="email" type="email" placeholder="Email" required>
       <input id="password" type="password" placeholder="Password (min. 6 karakter)" minlength="6" required>
-      <input id="displayName" class="registerOnly hidden" placeholder="Nama tampilan">
       <button id="authSubmit" type="submit">Login</button>
     </form>
     <p id="authMsg" class="msg"></p>
@@ -287,41 +285,10 @@
 
 <script src="app.js"></script>
 
-<script>
-function showAdminLogin(){
-  const auth = document.getElementById("authView");
-  const app = document.getElementById("appView");
-  if(auth) auth.classList.remove("hidden");
-  if(app) app.classList.add("hidden");
-  const btn = document.getElementById("adminLoginBtn");
-  if(btn) btn.style.display = "none";
-}
-</script>
 
 
-<script>
-(function(){
-  function setPublicNav(isAdmin){
-    const allowed = ["performancePage","journalPage"];
-    document.querySelectorAll(".navBtn").forEach(btn=>{
-      const page = btn.dataset.page;
-      btn.classList.toggle("hidden", !isAdmin && !allowed.includes(page));
-    });
-    if(!isAdmin){
-      document.querySelectorAll(".page").forEach(page=>{
-        if(!allowed.includes(page.id)) page.classList.add("hidden");
-      });
-      const journal = document.getElementById("journalPage");
-      const perf = document.getElementById("performancePage");
-      if(journal && perf && journal.classList.contains("hidden") && perf.classList.contains("hidden")){
-        journal.classList.remove("hidden");
-      }
-    }
-  }
-  window.setPublicNav = setPublicNav;
-  window.addEventListener("DOMContentLoaded", ()=>setPublicNav(true));
-})();
-</script>
+
+
 
 </body>
 </html>
