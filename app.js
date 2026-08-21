@@ -1,96 +1,52 @@
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
 
 let currentUser = null, trades = [], authMode = "login", accounts = [], payouts = [];
-let prop = {
-  account:5000,
-  targetPct:6,
-  maxDDPct:4,
-  dailyLossPct:2,
-  consistencyPct:20,
-  buffer:100
-};
-
+let prop = {account:5000,targetPct:6,maxDDPct:4,dailyLossPct:2,consistencyPct:20,buffer:100};
 let editingAccountId = null;
 let calendarCursor = new Date();
 
 function setValueClass(id, value, mode="normal"){
-  const el=$(id);
-  if(!el)return;
-
+  const el=$(id); if(!el)return;
   el.classList.remove("positive","negative","neutralValue");
-
-  if(mode==="winrate"){
-    el.classList.add(Number(value)>=50?"positive":"negative");
-  }
-  else if(Number(value)>0){
-    el.classList.add("positive");
-  }
-  else if(Number(value)<0){
-    el.classList.add("negative");
-  }
-  else{
-    el.classList.add("neutralValue");
-  }
+  if(mode==="winrate") el.classList.add(Number(value)>=50?"positive":"negative");
+  else if(Number(value)>0) el.classList.add("positive");
+  else if(Number(value)<0) el.classList.add("negative");
+  else el.classList.add("neutralValue");
 }
 
 const $ = id => document.getElementById(id);
-
-const money = n =>
-  `${n < 0 ? "-" : ""}$${Math.abs(Number(n)||0).toFixed(2)}`;
+const money = n => `${n < 0 ? "-" : ""}$${Math.abs(Number(n)||0).toFixed(2)}`;
 
 function show(id, yes=true){
   const el=$(id);
   if(el) el.classList.toggle("hidden", !yes);
 }
 
-
-/* =========================================================
-   INITIALIZATION / AUTH
-========================================================= */
-
 async function init(){
-
-  if(
-    !SUPABASE_PUBLISHABLE_KEY ||
-    SUPABASE_PUBLISHABLE_KEY.includes("PASTE_")
-  ){
-    if($("authMsg")){
-      $("authMsg").textContent =
-        "Masukkan Supabase Publishable Key di config.js terlebih dahulu.";
-    }
+  if(!SUPABASE_PUBLISHABLE_KEY || SUPABASE_PUBLISHABLE_KEY.includes("PASTE_")){
+    if($("authMsg"))
+      $("authMsg").textContent="Masukkan Supabase Publishable Key di config.js terlebih dahulu.";
     return;
   }
 
-  const {
-    data:{session}
-  } = await sb.auth.getSession();
+  const {data:{session}} = await sb.auth.getSession();
 
   if(session){
     await enterApp(session.user);
-  }
-  else{
+  }else{
     await enterPublic();
   }
 
   sb.auth.onAuthStateChange(async (_event, session)=>{
-
     if(session){
       await enterApp(session.user);
-    }
-    else{
+    }else{
       await enterPublic();
     }
-
   });
 }
 
-
-/* =========================================================
-   PUBLIC VIEW ONLY
-========================================================= */
-
 function setPublicNav(isAdmin){
-
   const publicPages = new Set([
     "journalPage",
     "performancePage",
@@ -98,14 +54,12 @@ function setPublicNav(isAdmin){
   ]);
 
   document.querySelectorAll(".navBtn").forEach(btn=>{
+    const page=btn.dataset.page;
 
-    const page = btn.dataset.page;
-
-    btn.style.display =
+    btn.style.display=
       isAdmin || publicPages.has(page)
         ? ""
         : "none";
-
   });
 
   if(!isAdmin){
@@ -113,9 +67,7 @@ function setPublicNav(isAdmin){
   }
 }
 
-
 function setPublicControls(isAdmin){
-
   [
     "addTradeBtn",
     "addAccountBtn",
@@ -124,40 +76,42 @@ function setPublicControls(isAdmin){
     "exportBtn",
     "modeBtn"
   ].forEach(id=>{
-
     const el=$(id);
-
-    if(el){
-      el.classList.toggle("hidden", !isAdmin);
-    }
-
+    if(el) el.classList.toggle("hidden",!isAdmin);
   });
 
   document.querySelectorAll(".admin-only").forEach(el=>{
-    el.classList.toggle("hidden", !isAdmin);
+    el.classList.toggle("hidden",!isAdmin);
   });
-
 }
 
-
 /* =========================================================
-   ADMIN LOGIN BUTTON
+   ADMIN LOGIN
 ========================================================= */
 
 function showAdminLogin(){
+  setAuthMode("login");
 
-  show("authView", true);
-  show("appView", false);
-  show("logoutBtn", false);
+  show("authView",true);
+  show("appView",false);
+  show("logoutBtn",false);
 
   const btn=$("adminLoginBtn");
 
   if(btn){
     btn.style.display="none";
   }
-
 }
 
+/* INI BAGIAN PENTING UNTUK TOMBOL ADMIN LOGIN */
+const adminLoginBtn=$("adminLoginBtn");
+
+if(adminLoginBtn){
+  adminLoginBtn.onclick=()=>{
+    setAuthMode("login");
+    showAdminLogin();
+  };
+}
 
 /* =========================================================
    ADMIN MODE
@@ -167,9 +121,9 @@ async function enterApp(user){
 
   currentUser=user;
 
-  show("authView", false);
-  show("appView", true);
-  show("logoutBtn", true);
+  show("authView",false);
+  show("appView",true);
+  show("logoutBtn",true);
 
   const btn=$("adminLoginBtn");
 
@@ -184,21 +138,19 @@ async function enterApp(user){
   await loadProp();
   await loadAccounts();
   await loadPayouts();
-
 }
 
-
 /* =========================================================
-   PUBLIC MODE
+   PUBLIC VIEW ONLY
 ========================================================= */
 
 async function enterPublic(){
 
   currentUser=null;
 
-  show("authView", false);
-  show("appView", true);
-  show("logoutBtn", false);
+  show("authView",false);
+  show("appView",true);
+  show("logoutBtn",false);
 
   const btn=$("adminLoginBtn");
 
@@ -209,50 +161,23 @@ async function enterPublic(){
   setPublicNav(false);
   setPublicControls(false);
 
-  /*
-    PUBLIC MODE:
-
-    Hanya SELECT data.
-
-    Tidak ada INSERT.
-    Tidak ada UPDATE.
-    Tidak ada DELETE.
-
-    Supabase RLS harus mengizinkan SELECT
-    untuk role anon agar data bisa terlihat publik.
-  */
-
-  const {
-    data,
-    error
-  } = await sb
+  const {data,error}=await sb
     .from("trades")
     .select("*")
     .order("trade_date",{ascending:true});
 
   if(error){
-
-    console.error(
-      "Public trades error:",
-      error
-    );
-
+    console.error("Public trades error:",error);
     trades=[];
-
-  }
-  else{
-
-    trades=data || [];
-
+  }else{
+    trades=data||[];
   }
 
   render();
   renderCalendar();
   setupPerfFilters();
   renderPerformance();
-
 }
-
 
 /* =========================================================
    LOGIN / REGISTER
@@ -265,7 +190,6 @@ $("loginTab").onclick=()=>{
 $("registerTab").onclick=()=>{
   setAuthMode("register");
 };
-
 
 function setAuthMode(mode){
 
@@ -290,15 +214,13 @@ function setAuthMode(mode){
       );
     });
 
-  $("authSubmit").textContent =
+  $("authSubmit").textContent=
     mode==="login"
-      ? "Login"
-      : "Register";
+      ?"Login"
+      :"Register";
 
   $("authMsg").textContent="";
-
 }
-
 
 $("authForm").onsubmit=async e=>{
 
@@ -313,26 +235,23 @@ $("authForm").onsubmit=async e=>{
 
   if(authMode==="login"){
 
-    result=
-      await sb.auth.signInWithPassword({
-        email,
-        password
-      });
+    result=await sb.auth.signInWithPassword({
+      email,
+      password
+    });
 
-  }
-  else{
+  }else{
 
-    result=
-      await sb.auth.signUp({
-        email,
-        password,
-        options:{
-          data:{
-            display_name:
-              $("displayName").value.trim()
-          }
+    result=await sb.auth.signUp({
+      email,
+      password,
+      options:{
+        data:{
+          display_name:
+            $("displayName").value.trim()
         }
-      });
+      }
+    });
 
   }
 
@@ -341,21 +260,17 @@ $("authForm").onsubmit=async e=>{
     $("authMsg").textContent=
       result.error.message;
 
-  }
-  else if(authMode==="register"){
+  }else if(authMode==="register"){
 
     $("authMsg").textContent=
       "Registrasi berhasil. Jika email confirmation aktif, cek email lalu login.";
 
   }
-
 };
-
 
 $("logoutBtn").onclick=()=>{
   sb.auth.signOut();
 };
-
 
 /* =========================================================
    TRADE MODAL
@@ -369,14 +284,11 @@ $("addTradeBtn").onclick=()=>{
   }
 
   show("modal",true);
-
 };
-
 
 $("closeModal").onclick=()=>{
   show("modal",false);
 };
-
 
 /* =========================================================
    ADD TRADE
@@ -394,13 +306,11 @@ $("tradeForm").onsubmit=async e=>{
   $("tradeMsg").textContent="Menyimpan...";
 
   const row={
-
-    user_id:
-      currentUser.id,
+    user_id:currentUser.id,
 
     account_id:
       $("tAccount")
-        ? $("tAccount").value || null
+        ? $("tAccount").value||null
         : null,
 
     trade_date:
@@ -414,17 +324,10 @@ $("tradeForm").onsubmit=async e=>{
     side:
       $("tSide").value,
 
-    entry:
-      num("tEntry"),
-
-    exit:
-      num("tExit"),
-
-    risk:
-      num("tRisk"),
-
-    pl:
-      num("tPL"),
+    entry:num("tEntry"),
+    exit:num("tExit"),
+    risk:num("tRisk"),
+    pl:num("tPL"),
 
     strategy:
       $("tStrategy").value.trim(),
@@ -437,7 +340,6 @@ $("tradeForm").onsubmit=async e=>{
 
     notes:
       $("tNotes").value.trim()
-
   };
 
   const {error}=
@@ -466,9 +368,7 @@ $("tradeForm").onsubmit=async e=>{
   await loadProp();
   await loadAccounts();
   await loadPayouts();
-
 };
-
 
 function num(id){
 
@@ -476,11 +376,9 @@ function num(id){
     parseFloat($(id).value);
 
   return Number.isFinite(v)
-    ? v
-    : 0;
-
+    ?v
+    :0;
 }
-
 
 /* =========================================================
    PROP FIRM
@@ -490,10 +388,7 @@ async function loadProp(){
 
   if(!currentUser)return;
 
-  const {
-    data,
-    error
-  }=
+  const {data,error}=
     await sb
       .from("profiles")
       .select("prop_settings")
@@ -505,19 +400,15 @@ async function loadProp(){
     data &&
     data.prop_settings
   ){
-
     prop={
       ...prop,
       ...data.prop_settings
     };
-
   }
 
   setPropInputs();
   renderProp();
-
 }
-
 
 function setPropInputs(){
 
@@ -532,16 +423,12 @@ function setPropInputs(){
 
   Object.entries(map).forEach(
     ([id,k])=>{
-
       if($(id)){
         $(id).value=prop[k];
       }
-
     }
   );
-
 }
-
 
 async function saveProp(){
 
@@ -554,25 +441,12 @@ async function saveProp(){
     parseFloat($(id).value)||0;
 
   prop={
-
-    account:
-      n("propAccount"),
-
-    targetPct:
-      n("propTargetPct"),
-
-    maxDDPct:
-      n("propMaxDDPct"),
-
-    dailyLossPct:
-      n("propDailyLossPct"),
-
-    consistencyPct:
-      n("propConsistencyPct"),
-
-    buffer:
-      n("propBuffer")
-
+    account:n("propAccount"),
+    targetPct:n("propTargetPct"),
+    maxDDPct:n("propMaxDDPct"),
+    dailyLossPct:n("propDailyLossPct"),
+    consistencyPct:n("propConsistencyPct"),
+    buffer:n("propBuffer")
   };
 
   const {error}=
@@ -581,7 +455,10 @@ async function saveProp(){
       .update({
         prop_settings:prop
       })
-      .eq("id",currentUser.id);
+      .eq(
+        "id",
+        currentUser.id
+      );
 
   if(error){
 
@@ -598,9 +475,7 @@ async function saveProp(){
   alert(
     "Pengaturan Prop Firm tersimpan."
   );
-
 }
-
 
 function renderProp(){
 
@@ -648,19 +523,19 @@ function renderProp(){
 
   const consistency=
     net>0
-      ? best/net*100
-      : 0;
+      ?best/net*100
+      :0;
 
   const progress=
     target>0
-      ? Math.max(
-          0,
-          Math.min(
-            100,
-            net/target*100
-          )
+      ?Math.max(
+        0,
+        Math.min(
+          100,
+          net/target*100
         )
-      : 0;
+      )
+      :0;
 
   $("propTarget").textContent=
     money(target);
@@ -687,31 +562,26 @@ function renderProp(){
     warn=
       "⛔ Max drawdown terlampaui.";
 
-  }
-  else if(
+  }else if(
     vals.some(v=>v<=-dailyLimit)
   ){
 
     warn=
       "⛔ Daily loss limit terlampaui.";
 
-  }
-  else if(
-    consistency>
-    prop.consistencyPct
+  }else if(
+    consistency>prop.consistencyPct
   ){
 
     warn=
       "⚠️ Consistency di atas batas. Sebarkan profit ke beberapa hari.";
 
-  }
-  else if(net>=target){
+  }else if(net>=target){
 
     warn=
       "✅ Target profit tercapai.";
 
-  }
-  else{
+  }else{
 
     warn=
       "🟢 Masih dalam batas. Sisa target: "+
@@ -724,11 +594,8 @@ function renderProp(){
 
   }
 
-  $("propWarning").textContent=
-    warn;
-
+  $("propWarning").textContent=warn;
 }
-
 
 $("modeBtn").onclick=()=>{
 
@@ -738,14 +605,10 @@ $("modeBtn").onclick=()=>{
   );
 
   renderProp();
-
 };
-
 
 $("savePropBtn").onclick=
   saveProp;
-
-
 /* =========================================================
    PERFORMANCE
 ========================================================= */
@@ -755,7 +618,6 @@ let performanceChart;
 function perfMoney(v){
   return money(v);
 }
-
 
 function setupPerfFilters(){
 
@@ -781,7 +643,6 @@ function setupPerfFilters(){
       .join("");
 
     s.value=old;
-
   };
 
   const opts=
@@ -791,8 +652,7 @@ function setupPerfFilters(){
         `${a.firm} — ${a.account_name}`
     }));
 
-  const a=
-    $("perfAccount");
+  const a=$("perfAccount");
 
   if(a){
 
@@ -809,7 +669,6 @@ function setupPerfFilters(){
         .join("");
 
     a.value=old;
-
   }
 
   fill(
@@ -826,9 +685,7 @@ function setupPerfFilters(){
     "perfSession",
     trades.map(t=>t.session)
   );
-
 }
-
 
 function getPerfTrades(){
 
@@ -866,16 +723,13 @@ function getPerfTrades(){
         (!from||d>=from)&&
         (!to||d<=to)
       );
-
     })
     .sort(
       (a,b)=>
         new Date(a.trade_date)-
         new Date(b.trade_date)
     );
-
 }
-
 
 function groupPerf(ts,key){
 
@@ -904,7 +758,6 @@ function groupPerf(ts,key){
 
     if(p>0)g[k].w++;
     if(p<0)g[k].l++;
-
   });
 
   return Object
@@ -914,16 +767,14 @@ function groupPerf(ts,key){
       name,
       wr:
         x.n
-          ? x.w/x.n*100
-          : 0
+          ?x.w/x.n*100
+          :0
     }))
     .sort(
       (a,b)=>
         b.pl-a.pl
     );
-
 }
-
 
 function renderPerfTable(id,rows){
 
@@ -935,8 +786,10 @@ function renderPerfTable(id,rows){
     rows
       .map(x=>
         `<div class="trade">
+
           <div>
             <b>${esc(x.name)}</b>
+
             <span>
               ${x.wr.toFixed(1)}% WR
             </span>
@@ -956,16 +809,14 @@ function renderPerfTable(id,rows){
               ${money(x.pl)}
 
             </b>
-
           </small>
+
         </div>`
       )
       .join("")
       ||
       '<p class="muted">Belum ada data.</p>';
-
 }
-
 
 function renderPerformance(){
 
@@ -1007,29 +858,29 @@ function renderPerformance(){
 
   const wr=
     ts.length
-      ? wins.length/
-        ts.length*100
-      : 0;
+      ?wins.length/
+       ts.length*100
+      :0;
 
   const pf=
     grossL
-      ? grossW/grossL
-      : 0;
+      ?grossW/grossL
+      :0;
 
   const avgW=
     wins.length
-      ? grossW/wins.length
-      : 0;
+      ?grossW/wins.length
+      :0;
 
   const avgL=
     losses.length
-      ? grossL/losses.length
-      : 0;
+      ?grossL/losses.length
+      :0;
 
   const exp=
     ts.length
-      ? net/ts.length
-      : 0;
+      ?net/ts.length
+      :0;
 
   let eq=0;
   let peak=0;
@@ -1050,7 +901,6 @@ function renderPerformance(){
         maxDD,
         peak-eq
       );
-
   });
 
   const days={};
@@ -1065,7 +915,6 @@ function renderPerformance(){
     days[d]=
       (days[d]||0)+
       Number(t.pl||0);
-
   });
 
   const dayVals=
@@ -1073,13 +922,13 @@ function renderPerformance(){
 
   const best=
     dayVals.length
-      ? Math.max(...dayVals)
-      : 0;
+      ?Math.max(...dayVals)
+      :0;
 
   const worst=
     dayVals.length
-      ? Math.min(...dayVals)
-      : 0;
+      ?Math.min(...dayVals)
+      :0;
 
   [
     ["pTotal",ts.length],
@@ -1115,11 +964,10 @@ function renderPerformance(){
 
         x.name=
           a
-            ? `${a.firm} — ${a.account_name}`
-            : x.name;
+            ?`${a.firm} — ${a.account_name}`
+            :x.name;
 
         return x;
-
       })
   );
 
@@ -1161,6 +1009,7 @@ function renderPerformance(){
       pd
         .map(([d,p])=>
           `<div class="trade">
+
             <div>
               <b>${d}</b>
 
@@ -1174,23 +1023,20 @@ function renderPerformance(){
 
               </b>
             </div>
+
           </div>`
         )
         .join("")
         ||
         '<p class="muted">Belum ada data.</p>';
-
   }
 
   drawPerformanceChart(ts);
-
 }
-
 
 function drawPerformanceChart(ts){
 
-  const c=
-    $("performanceChart");
+  const c=$("performanceChart");
 
   if(!c)return;
 
@@ -1223,7 +1069,6 @@ function drawPerformanceChart(ts){
     eq+=Number(t.pl||0);
 
     pts.push(eq);
-
   });
 
   let min=
@@ -1236,14 +1081,11 @@ function drawPerformanceChart(ts){
 
     min-=1;
     max+=1;
-
   }
 
   ctx.beginPath();
 
-  ctx.strokeStyle=
-    "#58a6ff";
-
+  ctx.strokeStyle="#58a6ff";
   ctx.lineWidth=5;
 
   pts.forEach((v,i)=>{
@@ -1263,13 +1105,10 @@ function drawPerformanceChart(ts){
       ctx.moveTo(x,y);
     else
       ctx.lineTo(x,y);
-
   });
 
   ctx.stroke();
-
 }
-
 
 [
   "perfAccount",
@@ -1286,11 +1125,8 @@ function drawPerformanceChart(ts){
       "change",
       renderPerformance
     );
-
   }
-
 });
-
 
 if($("perfReset")){
 
@@ -1308,15 +1144,11 @@ if($("perfReset")){
       if($(id)){
         $(id).value="";
       }
-
     });
 
     renderPerformance();
-
   };
-
 }
-
 
 /* =========================================================
    PROP ACCOUNTS
@@ -1326,10 +1158,7 @@ async function loadAccounts(){
 
   if(!currentUser)return;
 
-  const {
-    data,
-    error
-  }=
+  const {data,error}=
     await sb
       .from("prop_accounts")
       .select("*")
@@ -1346,8 +1175,7 @@ async function loadAccounts(){
 
     accounts=data||[];
 
-  }
-  else{
+  }else{
 
     console.error(error);
 
@@ -1360,18 +1188,13 @@ async function loadAccounts(){
   renderCalendar();
   setupPerfFilters();
   renderPerformance();
-
 }
-
 
 async function loadPayouts(){
 
   if(!currentUser)return;
 
-  const {
-    data,
-    error
-  }=
+  const {data,error}=
     await sb
       .from("payouts")
       .select("*")
@@ -1388,8 +1211,7 @@ async function loadPayouts(){
 
     payouts=data||[];
 
-  }
-  else{
+  }else{
 
     console.error(error);
 
@@ -1397,14 +1219,10 @@ async function loadPayouts(){
 
   renderPayouts();
   renderGlobal();
-
 }
-
-
 function renderAccounts(){
 
-  const box=
-    $("accountList");
+  const box=$("accountList");
 
   if(!box)return;
 
@@ -1444,16 +1262,14 @@ function renderAccounts(){
 
         const progress=
           target
-            ? Math.max(
-                0,
-                pl/target*100
-              )
-            : 0;
+            ?Math.max(
+              0,
+              pl/target*100
+            )
+            :0;
 
         const consistency=
-          getAccountConsistency(
-            a.id
-          );
+          getAccountConsistency(a.id);
 
         const rule=
           Number(
@@ -1462,12 +1278,12 @@ function renderAccounts(){
 
         const consistencyClass=
           ats.length
-            ? (
-                !rule ||
-                consistency<=rule
-                  ?"positive"
-                  :"negative"
-              )
+            ?(
+              !rule||
+              consistency<=rule
+                ?"positive"
+                :"negative"
+            )
             :"neutralValue";
 
         const statusClass=
@@ -1495,7 +1311,6 @@ function renderAccounts(){
             </span>
 
           </div>
-
 
           <div class="accountMetrics">
 
@@ -1530,8 +1345,8 @@ function renderAccounts(){
               <b class="${consistencyClass}">
                 ${
                   ats.length
-                    ? consistency.toFixed(1)+"%"
-                    : "—"
+                    ?consistency.toFixed(1)+"%"
+                    :"—"
                 }
               </b>
             </div>
@@ -1545,7 +1360,6 @@ function renderAccounts(){
 
           </div>
 
-
           <div class="progress">
             <i
               style="width:${Math.min(
@@ -1557,7 +1371,6 @@ function renderAccounts(){
               )}%">
             </i>
           </div>
-
 
           <div class="accountRuleLine">
 
@@ -1578,7 +1391,6 @@ function renderAccounts(){
             </span>
 
           </div>
-
 
           <div class="accountActions">
 
@@ -1604,7 +1416,6 @@ function renderAccounts(){
 
         </div>
         `;
-
       })
       .join("")
       ||
@@ -1632,9 +1443,7 @@ function renderAccounts(){
 
       </div>
       `;
-
 }
-
 
 async function setAccountStatus(id){
 
@@ -1672,9 +1481,7 @@ async function setAccountStatus(id){
     alert(error.message);
   else
     loadAccounts();
-
 }
-
 
 async function deleteAccount(id){
 
@@ -1707,18 +1514,15 @@ async function deleteAccount(id){
     await loadPayouts();
 
   }
-
 }
 
-
 /* =========================================================
-   PAYOUTS
+   PAYOUT
 ========================================================= */
 
 function renderPayouts(){
 
-  const box=
-    $("payoutList");
+  const box=$("payoutList");
 
   if(!box)return;
 
@@ -1760,19 +1564,15 @@ function renderPayouts(){
 
         </div>
         `;
-
       })
       .join("")
       ||
       '<p class="muted">Belum ada payout.</p>';
-
 }
-
 
 function fillTradeAccounts(){
 
-  const s=
-    $("tAccount");
+  const s=$("tAccount");
 
   if(!s)return;
 
@@ -1787,14 +1587,11 @@ function fillTradeAccounts(){
         </option>`
       )
       .join("");
-
 }
-
 
 function fillPayoutAccounts(){
 
-  const s=
-    $("pAccount");
+  const s=$("pAccount");
 
   if(!s)return;
 
@@ -1808,9 +1605,7 @@ function fillPayoutAccounts(){
         </option>`
       )
       .join("");
-
 }
-
 
 function getAccountConsistency(accountId){
 
@@ -1831,7 +1626,6 @@ function getAccountConsistency(accountId){
     daily[d]=
       (daily[d]||0)+
       Number(t.pl||0);
-
   });
 
   const total=
@@ -1847,15 +1641,13 @@ function getAccountConsistency(accountId){
 
   const best=
     positiveDays.length
-      ? Math.max(...positiveDays)
-      : 0;
+      ?Math.max(...positiveDays)
+      :0;
 
   return total>0
-    ? best/total*100
-    : 0;
-
+    ?best/total*100
+    :0;
 }
-
 
 /* =========================================================
    GLOBAL DASHBOARD
@@ -1866,10 +1658,7 @@ function renderGlobal(){
   const fees=
     accounts.reduce(
       (s,a)=>
-        s+
-        Number(
-          a.purchase_fee||0
-        ),
+        s+Number(a.purchase_fee||0),
       0
     );
 
@@ -1880,8 +1669,7 @@ function renderGlobal(){
       )
       .reduce(
         (s,p)=>
-          s+
-          Number(p.amount||0),
+          s+Number(p.amount||0),
         0
       );
 
@@ -1897,14 +1685,10 @@ function renderGlobal(){
     );
 
   const wins=
-    vals.filter(
-      v=>v>0
-    );
+    vals.filter(v=>v>0);
 
   const losses=
-    vals.filter(
-      v=>v<0
-    );
+    vals.filter(v=>v<0);
 
   const grossW=
     wins.reduce(
@@ -1922,22 +1706,21 @@ function renderGlobal(){
 
   const wr=
     vals.length
-      ? wins.length/
-        vals.length*100
-      : 0;
+      ?wins.length/vals.length*100
+      :0;
 
   const pf=
     grossL
-      ? grossW/grossL
-      : 0;
+      ?grossW/grossL
+      :0;
 
   const netCash=
     pays-fees;
 
   const roi=
     fees
-      ? netCash/fees*100
-      : 0;
+      ?netCash/fees*100
+      :0;
 
   const countStatus=
     s=>
@@ -1945,10 +1728,8 @@ function renderGlobal(){
         a=>
           (a.status||"")
             .toLowerCase()
-            .replace(
-              /\s+/g,
-              " "
-            )===s
+            .replace(/\s+/g," ")
+            ===s
       ).length;
 
   [
@@ -1972,42 +1753,13 @@ function renderGlobal(){
     }
   );
 
-  setValueClass(
-    "gTradingPL",
-    pl
-  );
-
-  setValueClass(
-    "gNet",
-    netCash
-  );
-
-  setValueClass(
-    "gFees",
-    -fees
-  );
-
-  setValueClass(
-    "gPayouts",
-    pays
-  );
-
-  setValueClass(
-    "gCashROI",
-    roi
-  );
-
-  setValueClass(
-    "gWinRate",
-    wr,
-    "winrate"
-  );
-
-  setValueClass(
-    "gProfitFactor",
-    pf
-  );
-
+  setValueClass("gTradingPL",pl);
+  setValueClass("gNet",netCash);
+  setValueClass("gFees",-fees);
+  setValueClass("gPayouts",pays);
+  setValueClass("gCashROI",roi);
+  setValueClass("gWinRate",wr,"winrate");
+  setValueClass("gProfitFactor",pf);
 
   const todayKey=
     new Date()
@@ -2026,7 +1778,6 @@ function renderGlobal(){
     daily[d]=
       (daily[d]||0)+
       Number(t.pl||0);
-
   });
 
   const todayPL=
@@ -2037,28 +1788,26 @@ function renderGlobal(){
 
   const bestDay=
     dayVals.length
-      ? Math.max(...dayVals)
-      : 0;
+      ?Math.max(...dayVals)
+      :0;
 
   const worstDay=
     dayVals.length
-      ? Math.min(...dayVals)
-      : 0;
+      ?Math.min(...dayVals)
+      :0;
 
   const riskCount=
     accounts.filter(a=>{
 
       const c=
-        getAccountConsistency(
-          a.id
-        );
+        getAccountConsistency(a.id);
 
       const r=
         Number(
           a.consistency_pct||0
         );
 
-      return r>0 && c>r;
+      return r>0&&c>r;
 
     }).length;
 
@@ -2075,24 +1824,11 @@ function renderGlobal(){
     }
   );
 
-  setValueClass(
-    "gTodayPL",
-    todayPL
-  );
+  setValueClass("gTodayPL",todayPL);
+  setValueClass("gBestDay",bestDay);
+  setValueClass("gWorstDay",worstDay);
 
-  setValueClass(
-    "gBestDay",
-    bestDay
-  );
-
-  setValueClass(
-    "gWorstDay",
-    worstDay
-  );
-
-
-  const list=
-    $("globalAccountList");
+  const list=$("globalAccountList");
 
   if(list){
 
@@ -2101,8 +1837,7 @@ function renderGlobal(){
         .map(a=>{
 
           const st=
-            a.status||
-            "Phase 1";
+            a.status||"Phase 1";
 
           const plA=
             trades
@@ -2111,8 +1846,7 @@ function renderGlobal(){
               )
               .reduce(
                 (s,t)=>
-                  s+
-                  Number(t.pl||0),
+                  s+Number(t.pl||0),
                 0
               );
 
@@ -2125,15 +1859,12 @@ function renderGlobal(){
               )
               .reduce(
                 (s,p)=>
-                  s+
-                  Number(p.amount||0),
+                  s+Number(p.amount||0),
                 0
               );
 
           const currentConsistency=
-            getAccountConsistency(
-              a.id
-            );
+            getAccountConsistency(a.id);
 
           const rule=
             Number(
@@ -2142,11 +1873,11 @@ function renderGlobal(){
 
           const consistencyClass=
             rule>0
-              ? (
-                  currentConsistency<=rule
-                    ?"positive"
-                    :"negative"
-                )
+              ?(
+                currentConsistency<=rule
+                  ?"positive"
+                  :"negative"
+              )
               :"muted";
 
           return `
@@ -2182,8 +1913,8 @@ function renderGlobal(){
 
                 ${
                   rule
-                    ? ` / Rule ${rule}%`
-                    : ""
+                    ?` / Rule ${rule}%`
+                    :""
                 }
 
               </span>
@@ -2192,27 +1923,18 @@ function renderGlobal(){
 
           </div>
           `;
-
         })
         .join("")
         ||
         '<p class="muted">Belum ada akun Prop Firm.</p>';
-
   }
 
   drawGlobalEquity();
-
 }
-
-
-/* =========================================================
-   GLOBAL EQUITY
-========================================================= */
 
 function drawGlobalEquity(){
 
-  const c=
-    $("globalEquityChart");
+  const c=$("globalEquityChart");
 
   if(!c)return;
 
@@ -2253,63 +1975,37 @@ function drawGlobalEquity(){
   }
 
   let eq=0;
-
   const pts=[0];
 
   ts.forEach(t=>{
-
-    eq+=
-      Number(t.pl||0);
-
+    eq+=Number(t.pl||0);
     pts.push(eq);
-
   });
 
   if($("gEquityLabel")){
     $("gEquityLabel")
-      .textContent=
-      money(eq);
+      .textContent=money(eq);
   }
 
-  let min=
-    Math.min(
-      ...pts,
-      0
-    );
-
-  let max=
-    Math.max(
-      ...pts,
-      0
-    );
+  let min=Math.min(...pts,0);
+  let max=Math.max(...pts,0);
 
   if(min===max){
-
     min-=1;
     max+=1;
-
   }
 
   const X=i=>
-    i/
-    (pts.length-1)*
-    w;
+    i/(pts.length-1)*w;
 
   const Y=v=>
-    h-
-    (v-min)/
-    (max-min)*
-    h;
+    h-(v-min)/(max-min)*h;
 
-  const zero=
-    Y(0);
+  const zero=Y(0);
 
   const area=
     ctx.createLinearGradient(
-      0,
-      0,
-      0,
-      h
+      0,0,0,h
     );
 
   area.addColorStop(
@@ -2329,17 +2025,10 @@ function drawGlobalEquity(){
 
   ctx.beginPath();
 
-  pts.forEach(
-    (v,i)=>
-      i
-        ? ctx.lineTo(
-            X(i),
-            Y(v)
-          )
-        : ctx.moveTo(
-            X(i),
-            Y(v)
-          )
+  pts.forEach((v,i)=>
+    i
+      ?ctx.lineTo(X(i),Y(v))
+      :ctx.moveTo(X(i),Y(v))
   );
 
   ctx.lineTo(w,h);
@@ -2349,25 +2038,16 @@ function drawGlobalEquity(){
   ctx.fillStyle=area;
   ctx.fill();
 
-
   ctx.beginPath();
 
-  ctx.moveTo(
-    0,
-    zero
-  );
-
-  ctx.lineTo(
-    w,
-    zero
-  );
+  ctx.moveTo(0,zero);
+  ctx.lineTo(w,zero);
 
   ctx.strokeStyle=
     "rgba(139,148,158,.35)";
 
   ctx.lineWidth=2;
   ctx.stroke();
-
 
   for(
     let i=1;
@@ -2391,53 +2071,34 @@ function drawGlobalEquity(){
 
     ctx.strokeStyle=
       pts[i]>=pts[i-1]
-        ? "#3fb950"
-        : "#f85149";
+        ?" #3fb950".trim()
+        :"#f85149";
 
     ctx.lineCap="round";
-
     ctx.stroke();
-
   }
-
 }
-
-
 /* =========================================================
    CALENDAR
 ========================================================= */
 
 function renderCalendar(){
 
-  const box=
-    $("calendarGrid");
+  const box=$("calendarGrid");
 
   if(!box)return;
 
   const now=
-    new Date(
-      calendarCursor
-    );
+    new Date(calendarCursor);
 
-  const y=
-    now.getFullYear();
-
-  const m=
-    now.getMonth();
+  const y=now.getFullYear();
+  const m=now.getMonth();
 
   const first=
-    new Date(
-      y,
-      m,
-      1
-    ).getDay();
+    new Date(y,m,1).getDay();
 
   const days=
-    new Date(
-      y,
-      m+1,
-      0
-    ).getDate();
+    new Date(y,m+1,0).getDate();
 
   const monthTitle=
     now.toLocaleDateString(
@@ -2450,12 +2111,9 @@ function renderCalendar(){
 
   if($("calTitle")){
 
-    $("calTitle")
-      .textContent=
-        monthTitle
-          .charAt(0)
-          .toUpperCase()+
-        monthTitle.slice(1);
+    $("calTitle").textContent=
+      monthTitle.charAt(0).toUpperCase()+
+      monthTitle.slice(1);
 
   }
 
@@ -2479,29 +2137,17 @@ function renderCalendar(){
       )
       .join("");
 
-  for(
-    let i=0;
-    i<first;
-    i++
-  ){
+  for(let i=0;i<first;i++){
 
     h+=
       '<div class="calEmpty"></div>';
 
   }
 
-  for(
-    let d=1;
-    d<=days;
-    d++
-  ){
+  for(let d=1;d<=days;d++){
 
     const dt=
-      new Date(
-        y,
-        m,
-        d
-      );
+      new Date(y,m,d);
 
     const key=
       dt
@@ -2512,17 +2158,14 @@ function renderCalendar(){
       trades
         .filter(
           t=>
-            new Date(
-              t.trade_date
-            )
-            .toISOString()
-            .slice(0,10)
-            ===key
+            new Date(t.trade_date)
+              .toISOString()
+              .slice(0,10)
+              ===key
         )
         .reduce(
           (s,t)=>
-            s+
-            Number(t.pl||0),
+            s+Number(t.pl||0),
           0
         );
 
@@ -2544,9 +2187,7 @@ function renderCalendar(){
         data-date="${key}"
       >
 
-        <b>
-          ${d}
-        </b>
+        <b>${d}</b>
 
         <small>
           ${dayPL?money(dayPL):"—"}
@@ -2554,13 +2195,10 @@ function renderCalendar(){
 
       </button>
     `;
-
   }
 
   box.innerHTML=h;
-
 }
-
 
 if($("calPrev")){
 
@@ -2571,11 +2209,8 @@ if($("calPrev")){
     );
 
     renderCalendar();
-
   };
-
 }
-
 
 if($("calNext")){
 
@@ -2586,25 +2221,18 @@ if($("calNext")){
     );
 
     renderCalendar();
-
   };
-
 }
-
 
 if($("calToday")){
 
   $("calToday").onclick=()=>{
 
-    calendarCursor=
-      new Date();
+    calendarCursor=new Date();
 
     renderCalendar();
-
   };
-
 }
-
 
 /* =========================================================
    PAGE NAVIGATION
@@ -2615,8 +2243,7 @@ function openPage(pageId){
   document
     .querySelectorAll(".page")
     .forEach(
-      p=>
-        p.classList.add("hidden")
+      p=>p.classList.add("hidden")
     );
 
   document
@@ -2629,8 +2256,7 @@ function openPage(pageId){
         )
     );
 
-  const page=
-    $(pageId);
+  const page=$(pageId);
 
   if(page){
     page.classList.remove("hidden");
@@ -2667,12 +2293,9 @@ function openPage(pageId){
     top:0,
     behavior:"smooth"
   });
-
 }
 
-window.openPage=
-  openPage;
-
+window.openPage=openPage;
 
 /* =========================================================
    NAV + CALENDAR CLICK
@@ -2683,9 +2306,7 @@ document.addEventListener(
   function(e){
 
     const nav=
-      e.target.closest(
-        ".navBtn"
-      );
+      e.target.closest(".navBtn");
 
     if(nav){
 
@@ -2699,9 +2320,7 @@ document.addEventListener(
     }
 
     const day=
-      e.target.closest(
-        ".calDay"
-      );
+      e.target.closest(".calDay");
 
     if(day){
 
@@ -2723,12 +2342,9 @@ document.addEventListener(
       );
 
       renderPerformance();
-
     }
-
   }
 );
-
 
 /* =========================================================
    ACCOUNT MODAL
@@ -2751,8 +2367,7 @@ $("addAccountBtn").onclick=()=>{
   $("accountSubmitBtn").textContent=
     "Simpan Akun";
 
-  $("aStatus").value=
-    "Phase 1";
+  $("aStatus").value="Phase 1";
 
   $("aTarget").value=6;
   $("aMaxDD").value=4;
@@ -2763,9 +2378,7 @@ $("addAccountBtn").onclick=()=>{
     "accountModal",
     true
   );
-
 };
-
 
 $("closeAccountModal").onclick=()=>{
 
@@ -2775,9 +2388,7 @@ $("closeAccountModal").onclick=()=>{
     "accountModal",
     false
   );
-
 };
-
 
 $("addPayoutBtn").onclick=()=>{
 
@@ -2792,9 +2403,7 @@ $("addPayoutBtn").onclick=()=>{
     "payoutModal",
     true
   );
-
 };
-
 
 $("closePayoutModal").onclick=()=>{
   show(
@@ -2802,7 +2411,6 @@ $("closePayoutModal").onclick=()=>{
     false
   );
 };
-
 
 /* =========================================================
    EDIT ACCOUNT
@@ -2824,38 +2432,17 @@ async function editAccount(id){
 
   editingAccountId=id;
 
-  $("aFirm").value=
-    a.firm||"";
-
-  $("aName").value=
-    a.account_name||"";
-
-  $("aSize").value=
-    a.account_size??0;
-
-  $("aFee").value=
-    a.purchase_fee??0;
-
-  $("aStatus").value=
-    a.status||"Phase 1";
-
-  $("aTarget").value=
-    a.target_pct??6;
-
-  $("aMaxDD").value=
-    a.max_dd_pct??4;
-
-  $("aDaily").value=
-    a.daily_loss_pct??2;
-
-  $("aConsistency").value=
-    a.consistency_pct??20;
-
-  $("aStart").value=
-    a.start_date||"";
-
-  $("aNotes").value=
-    a.notes||"";
+  $("aFirm").value=a.firm||"";
+  $("aName").value=a.account_name||"";
+  $("aSize").value=a.account_size??0;
+  $("aFee").value=a.purchase_fee??0;
+  $("aStatus").value=a.status||"Phase 1";
+  $("aTarget").value=a.target_pct??6;
+  $("aMaxDD").value=a.max_dd_pct??4;
+  $("aDaily").value=a.daily_loss_pct??2;
+  $("aConsistency").value=a.consistency_pct??20;
+  $("aStart").value=a.start_date||"";
+  $("aNotes").value=a.notes||"";
 
   $("accountModalTitle").textContent=
     "Edit Prop Firm Account";
@@ -2869,12 +2456,9 @@ async function editAccount(id){
     "accountModal",
     true
   );
-
 }
 
-window.editAccount=
-  editAccount;
-
+window.editAccount=editAccount;
 
 /* =========================================================
    ACCOUNT FORM
@@ -2894,9 +2478,7 @@ $("accountForm").onsubmit=async e=>{
 
   const n=
     id=>
-      parseFloat(
-        $(id).value
-      )||0;
+      parseFloat($(id).value)||0;
 
   const row={
 
@@ -2932,7 +2514,6 @@ $("accountForm").onsubmit=async e=>{
 
     notes:
       $("aNotes").value.trim()
-
   };
 
   let result;
@@ -2952,8 +2533,7 @@ $("accountForm").onsubmit=async e=>{
           currentUser.id
         );
 
-  }
-  else{
+  }else{
 
     result=
       await sb
@@ -2963,7 +2543,6 @@ $("accountForm").onsubmit=async e=>{
           user_id:
             currentUser.id
         });
-
   }
 
   if(result.error){
@@ -2984,9 +2563,7 @@ $("accountForm").onsubmit=async e=>{
   );
 
   await loadAccounts();
-
 };
-
 
 /* =========================================================
    PAYOUT FORM
@@ -3022,7 +2599,6 @@ $("payoutForm").onsubmit=async e=>{
 
     note:
       $("pNote").value.trim()
-
   };
 
   const {error}=
@@ -3046,22 +2622,17 @@ $("payoutForm").onsubmit=async e=>{
   );
 
   await loadPayouts();
-
 };
 
-
 /* =========================================================
-   LOAD ADMIN TRADES
+   LOAD TRADES
 ========================================================= */
 
 async function loadTrades(){
 
   if(!currentUser)return;
 
-  const {
-    data,
-    error
-  }=
+  const {data,error}=
     await sb
       .from("trades")
       .select("*")
@@ -3081,8 +2652,7 @@ async function loadTrades(){
     return;
   }
 
-  trades=
-    data||[];
+  trades=data||[];
 
   render();
   renderProp();
@@ -3090,18 +2660,15 @@ async function loadTrades(){
   renderCalendar();
   setupPerfFilters();
   renderPerformance();
-
 }
 
-
 /* =========================================================
-   TRADING JOURNAL RENDER
+   TRADING JOURNAL
 ========================================================= */
 
 function render(){
 
-  const total=
-    trades.length;
+  const total=trades.length;
 
   const wins=
     trades.filter(
@@ -3116,16 +2683,14 @@ function render(){
   const net=
     trades.reduce(
       (a,t)=>
-        a+
-        Number(t.pl||0),
+        a+Number(t.pl||0),
       0
     );
 
   const grossWin=
     wins.reduce(
       (a,t)=>
-        a+
-        Number(t.pl),
+        a+Number(t.pl),
       0
     );
 
@@ -3133,21 +2698,18 @@ function render(){
     Math.abs(
       losses.reduce(
         (a,t)=>
-          a+
-          Number(t.pl),
+          a+Number(t.pl),
         0
       )
     );
 
   const wr=
     total
-      ? wins.length/
-        total*100
-      : 0;
+      ?wins.length/total*100
+      :0;
 
   if($("totalTrades"))
-    $("totalTrades").textContent=
-      total;
+    $("totalTrades").textContent=total;
 
   if($("winRate"))
     $("winRate").textContent=
@@ -3160,11 +2722,10 @@ function render(){
   if($("profitFactor"))
     $("profitFactor").textContent=
       grossLoss
-        ? (grossWin/grossLoss)
-            .toFixed(2)
-        : grossWin
-          ? "∞"
-          : "0.00";
+        ?(grossWin/grossLoss).toFixed(2)
+        :grossWin
+          ?"∞"
+          :"0.00";
 
   setValueClass(
     "winRate",
@@ -3180,14 +2741,9 @@ function render(){
   setValueClass(
     "profitFactor",
     grossLoss
-      ? grossWin/grossLoss
-      : (
-          grossWin
-            ? Infinity
-            : 0
-        )
+      ?grossWin/grossLoss
+      :(grossWin?Infinity:0)
   );
-
 
   const eq=[];
 
@@ -3197,23 +2753,19 @@ function render(){
 
   trades.forEach(t=>{
 
-    e+=
-      Number(t.pl||0);
+    e+=Number(t.pl||0);
 
-    peak=
-      Math.max(
-        peak,
-        e
-      );
+    peak=Math.max(
+      peak,
+      e
+    );
 
-    dd=
-      Math.max(
-        dd,
-        peak-e
-      );
+    dd=Math.max(
+      dd,
+      peak-e
+    );
 
     eq.push(e);
-
   });
 
   if($("maxDD"))
@@ -3234,7 +2786,6 @@ function render(){
     e
   );
 
-
   const days={};
 
   trades.forEach(t=>{
@@ -3247,7 +2798,6 @@ function render(){
     days[d]=
       (days[d]||0)+
       Number(t.pl||0);
-
   });
 
   const bestDay=
@@ -3265,11 +2815,10 @@ function render(){
     bestDay
   );
 
-
   const q=
     $("search")
-      ? $("search").value.toLowerCase()
-      : "";
+      ?$("search").value.toLowerCase()
+      :"";
 
   const filtered=
     trades.filter(t=>
@@ -3283,7 +2832,6 @@ function render(){
       .toLowerCase()
       .includes(q)
     );
-
 
   if($("tradeList")){
 
@@ -3329,7 +2877,7 @@ function render(){
 
             ${
               currentUser
-                ? `
+                ?`
                   <button
                     class="danger"
                     onclick="
@@ -3338,7 +2886,7 @@ function render(){
                     Hapus
                   </button>
                 `
-                : ""
+                :""
             }
 
           </div>
@@ -3357,21 +2905,16 @@ function render(){
       `<p class="muted">
         Belum ada trade.
       </p>`;
-
   }
 
   draw(eq);
-
 }
-
 
 if($("search")){
 
   $("search").oninput=
     render;
-
 }
-
 
 /* =========================================================
    DELETE TRADE
@@ -3405,43 +2948,33 @@ async function deleteTrade(id){
 
   if(error){
 
-    alert(
-      error.message
-    );
+    alert(error.message);
 
-  }
-  else{
+  }else{
 
     loadTrades();
 
   }
-
 }
 
-
 /* =========================================================
-   ESCAPE HTML
+   ESCAPE
 ========================================================= */
 
 function esc(v){
 
-  return String(
-    v??""
-  ).replace(
-    /[&<>"']/g,
-    m=>({
-
-      "&":"&amp;",
-      "<":"&lt;",
-      ">":"&gt;",
-      '"':"&quot;",
-      "'":"&#39;"
-
-    }[m])
-  );
-
+  return String(v??"")
+    .replace(
+      /[&<>"']/g,
+      m=>({
+        "&":"&amp;",
+        "<":"&lt;",
+        ">":"&gt;",
+        '"':"&quot;",
+        "'":"&#39;"
+      }[m])
+    );
 }
-
 
 /* =========================================================
    EQUITY CHART
@@ -3449,8 +2982,7 @@ function esc(v){
 
 function draw(data){
 
-  const c=
-    $("equityChart");
+  const c=$("equityChart");
 
   if(!c)return;
 
@@ -3462,19 +2994,13 @@ function draw(data){
 
   const h=260;
 
-  c.width=
-    w*dpr;
-
-  c.height=
-    h*dpr;
+  c.width=w*dpr;
+  c.height=h*dpr;
 
   const x=
     c.getContext("2d");
 
-  x.scale(
-    dpr,
-    dpr
-  );
+  x.scale(dpr,dpr);
 
   x.clearRect(
     0,
@@ -3483,8 +3009,7 @@ function draw(data){
     h
   );
 
-  x.strokeStyle=
-    "#27313d";
+  x.strokeStyle="#27313d";
 
   for(
     let i=1;
@@ -3492,38 +3017,23 @@ function draw(data){
     i++
   ){
 
-    let y=
-      i*h/4;
+    let y=i*h/4;
 
     x.beginPath();
 
-    x.moveTo(
-      0,
-      y
-    );
-
-    x.lineTo(
-      w,
-      y
-    );
+    x.moveTo(0,y);
+    x.lineTo(w,y);
 
     x.stroke();
-
   }
 
   if(!data.length)return;
 
   const min=
-    Math.min(
-      0,
-      ...data
-    );
+    Math.min(0,...data);
 
   const max=
-    Math.max(
-      0,
-      ...data
-    );
+    Math.max(0,...data);
 
   const range=
     max-min||1;
@@ -3535,10 +3045,8 @@ function draw(data){
 
       let px=
         data.length===1
-          ? w/2
-          : i/
-            (data.length-1)*
-            w;
+          ?w/2
+          :i/(data.length-1)*w;
 
       let py=
         h-
@@ -3549,28 +3057,16 @@ function draw(data){
         10;
 
       if(i)
-        x.lineTo(
-          px,
-          py
-        );
+        x.lineTo(px,py);
       else
-        x.moveTo(
-          px,
-          py
-        );
-
+        x.moveTo(px,py);
     }
   );
 
-  x.strokeStyle=
-    "#27d39a";
-
+  x.strokeStyle="#27d39a";
   x.lineWidth=3;
-
   x.stroke();
-
 }
-
 
 /* =========================================================
    EXPORT CSV
@@ -3604,8 +3100,8 @@ $("exportBtn").onclick=()=>{
           h=>
             `"${String(
               h==="date"
-                ? t.trade_date
-                : t[h]??""
+                ?t.trade_date
+                :t[h]??""
             ).replaceAll(
               '"',
               '""'
@@ -3638,19 +3134,14 @@ $("exportBtn").onclick=()=>{
 
   a.click();
 
-  URL.revokeObjectURL(
-    a.href
-  );
-
+  URL.revokeObjectURL(a.href);
 };
-
 
 /* =========================================================
    START
 ========================================================= */
 
 init();
-
 
 /* =========================================================
    NAVIGATION
@@ -3669,12 +3160,9 @@ document
         openPage(
           btn.dataset.page
         );
-
       }
     );
-
   });
-
 
 /* =========================================================
    RESIZE
@@ -3695,8 +3183,6 @@ window.addEventListener(
       drawPerformanceChart(
         getPerfTrades()
       );
-
     }
-
   }
 );
