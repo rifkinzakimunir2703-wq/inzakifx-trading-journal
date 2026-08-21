@@ -183,3 +183,95 @@ input,select,textarea{border-radius:7px!important;padding:9px 11px!important}
 .calEmpty{min-height:58px}.calDay{min-height:62px!important;transition:transform .12s,border-color .12s,background .12s}.calDay:hover{transform:translateY(-1px)}.calWin{background:rgba(63,185,80,.12)!important;border-color:rgba(63,185,80,.35)!important}.calLoss{background:rgba(248,81,73,.12)!important;border-color:rgba(248,81,73,.35)!important}.calToday{box-shadow:inset 0 0 0 2px var(--blue)!important}.calWin small{color:var(--success)!important}.calLoss small{color:var(--danger2)!important}
 .status.phase1,.status.phase2{background:rgba(255,193,7,.1);color:#d9a441;border-color:rgba(255,193,7,.25)}.status.funded{background:rgba(63,185,80,.1);color:var(--success);border-color:rgba(63,185,80,.25)}.status.failed,.status.closed{background:rgba(248,81,73,.1);color:var(--danger2);border-color:rgba(248,81,73,.25)}
 @media(max-width:760px){.healthGrid{grid-template-columns:repeat(2,1fr)}.calendarToolbar{justify-content:space-between}.calendarToolbar strong{min-width:auto}.calDay{min-height:54px!important}}
+
+
+/* VIEW ONLY / PUBLIC PORTAL */
+.topActions{display:flex;gap:8px;align-items:center}.viewModeBadge{margin-left:auto;font-size:11px;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:4px 8px}.viewOnlyLabel{font-size:11px;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:4px 8px}.view-only #addTradeBtn,.view-only #addAccountBtn,.view-only #addPayoutBtn,.view-only #modeBtn,.view-only #savePropBtn,.view-only #accountActions,.view-only .danger{display:none!important}.view-only .actions{justify-content:flex-end}
+
+
+/* INZAKI TRADE — dashboard theme matching the requested reference */
+:root{
+  --bg:#060a0f;
+  --surface:#0e141c;
+  --surface2:#0b1118;
+  --border:#202b37;
+  --text:#eef3f8;
+  --muted:#8995a3;
+  --green:#3fb950;
+  --blue:#4d8dff;
+  --purple:#a970ff;
+}
+html,body{background:var(--bg)!important;color:var(--text)!important}
+body{max-width:none!important;margin:0!important;padding:0 28px 30px!important;overflow-x:hidden!important}
+.siteHeader{
+  width:min(1180px,100%);margin:0 auto;padding:22px 0 18px;
+  display:flex;align-items:flex-end;justify-content:space-between;gap:22px;
+  border-bottom:1px solid var(--border);
+}
+.brandBlock{min-width:0}
+.brandMain{font-size:42px;line-height:.95;font-weight:850;letter-spacing:-1.8px;white-space:nowrap}
+.brandMain span{color:#f5f7fa}.brandMain b{color:var(--green);font-weight:850}
+.brandSub{margin-top:9px;font-size:11px;letter-spacing:.28em;color:var(--muted);font-weight:700}
+.topActionsBar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end}
+.topAction{
+  display:inline-flex!important;align-items:center;justify-content:center;gap:8px;
+  min-height:44px;padding:10px 16px!important;border-radius:9px!important;
+  text-decoration:none!important;font-weight:750!important;font-size:14px!important;
+  border:1px solid var(--border)!important;background:#141b24!important;color:var(--text)!important;
+  white-space:nowrap;cursor:pointer;
+}
+.topAction:hover{transform:translateY(-1px);border-color:#536273!important;background:#1a222d!important}
+.buyAction{border-color:rgba(63,185,80,.35)!important;background:rgba(35,134,54,.14)!important}
+.buyAction:hover{background:rgba(35,134,54,.23)!important;border-color:rgba(63,185,80,.65)!important}
+.discordAction{border-color:rgba(77,141,255,.32)!important;background:rgba(77,141,255,.12)!important}
+.discordAction:hover{background:rgba(77,141,255,.2)!important;border-color:rgba(77,141,255,.6)!important}
+.adminAction{background:#1a212b!important}
+.container{width:min(1180px,100%);max-width:none!important;margin:0 auto;padding:0!important}
+.ghBrand{display:none!important}
+.mainNav{width:100%;margin-top:16px!important;padding:8px!important;border:1px solid var(--border)!important;border-radius:10px!important;background:#0d131b!important;position:sticky!important;top:8px!important;z-index:20!important;box-shadow:0 8px 30px rgba(0,0,0,.22)}
+.navBtn{font-size:13px!important;padding:10px 13px!important;border-radius:7px!important}
+.navBtn.active{background:#1c252f!important;border-color:#303b48!important}
+.hero{padding:22px 0 20px!important;border-bottom:1px solid var(--border)!important;margin-bottom:20px!important}
+.hero h1{font-size:28px!important;font-weight:750!important;letter-spacing:-.6px!important}
+.eyebrow{color:var(--green)!important;font-weight:750!important}
+.dashSection{margin-bottom:24px!important}
+.dashSectionHead{margin-bottom:12px!important}
+.dashSectionHead h2{font-size:17px!important}
+.dashIcon{font-size:22px!important}
+.dashSectionHead p{font-size:12px!important}
+.card,.panel{background:var(--surface)!important;border:1px solid var(--border)!important;border-radius:10px!important;box-shadow:none!important}
+.card{padding:18px!important}
+.card small{font-size:12px!important;color:var(--muted)!important}
+.card strong{font-size:24px!important;font-weight:750!important}
+.globalCards{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:12px!important}
+.globalCards .card{min-height:92px;display:flex;flex-direction:column;justify-content:center}
+.globalCards .card strong.positive{color:var(--green)!important}
+.dashTag{border-color:var(--border)!important}
+.globalAccountList{background:var(--surface)!important;border-color:var(--border)!important}
+.quickHealth{margin-top:20px!important}
+#globalEquityChart,#performanceChart,#equityChart{background:#0e141c;border-radius:10px}
+.siteHeader + .container{}
+.auth{margin:60px auto!important}
+
+@media(max-width:760px){
+  body{padding:0 12px 78px!important}
+  .siteHeader{display:block;padding:16px 0 12px}
+  .brandMain{font-size:32px;letter-spacing:-1.2px;text-align:center}
+  .brandSub{text-align:center;font-size:9px;letter-spacing:.22em;margin-top:7px}
+  .topActionsBar{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}
+  .topAction{width:100%;min-height:42px;padding:9px 8px!important;font-size:12px!important}
+  .adminAction{grid-column:1/-1}
+  .mainNav{position:sticky!important;top:5px!important;margin-top:12px!important;overflow-x:auto!important;white-space:nowrap!important}
+  .mainNav .navBtn{flex:0 0 auto!important}
+  .hero{padding:16px 0!important}
+  .hero h1{font-size:22px!important}
+  .globalCards,.cards,.performanceCards{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+}
+@media(max-width:390px){
+  body{padding-left:8px!important;padding-right:8px!important}
+  .brandMain{font-size:28px}
+  .topAction{font-size:11px!important}
+  .globalCards,.cards,.performanceCards{gap:8px!important}
+  .card{padding:13px!important}
+  .card strong{font-size:19px!important}
+}

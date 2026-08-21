@@ -23,22 +23,17 @@
 
 </head>
 <body>
-<div id="indicatorLinks" style="position:fixed;left:14px;top:14px;z-index:9998;display:flex;gap:8px;flex-wrap:wrap">
-  <a href="https://lynk.id/inzakifx" target="_blank" rel="noopener noreferrer"
-     style="padding:9px 13px;border-radius:10px;border:1px solid #30363d;background:#161b22;color:#fff;text-decoration:none;font-weight:600">
-    🛒 Beli INDICATOR
-  </a>
-  <a href="https://discord.gg/PTMNaDqbj" target="_blank" rel="noopener noreferrer"
-     style="padding:9px 13px;border-radius:10px;border:1px solid #30363d;background:#161b22;color:#fff;text-decoration:none;font-weight:600">
-    💬 Discord Group
-  </a>
-</div>
-
-<button id="adminLoginBtn" type="button" onclick="showAdminLogin()" style="position:fixed;right:14px;top:14px;z-index:9999;padding:9px 13px;border-radius:10px;border:1px solid #30363d;background:#161b22;color:#fff;cursor:pointer">🔐 Admin Login</button>
-
-<header class="topbar">
-  <div><b>INZAKI</b><small>Trading Journal</small></div>
-  <button id="logoutBtn" class="secondary hidden">Logout</button>
+<header class="siteHeader">
+  <div class="brandBlock">
+    <div class="brandMain"><span>INZAKI</span><b>TRADE</b></div>
+    <div class="brandSub">WORKSPACE DASHBOARD</div>
+  </div>
+  <div class="topActionsBar">
+    <a class="topAction buyAction" href="https://lynk.id/inzakifx" target="_blank" rel="noopener noreferrer">🛒 <span>Beli INDICATOR</span></a>
+    <a class="topAction discordAction" href="https://discord.gg/PTMNaDqbj" target="_blank" rel="noopener noreferrer">💬 <span>Discord Group</span></a>
+    <button id="adminLoginBtn" class="topAction adminAction" type="button" onclick="showAdminLogin()">🔐 <span>Admin Login</span></button>
+    <button id="logoutBtn" class="topAction adminAction hidden">Logout</button>
+  </div>
 </header>
 
 <main class="container">
