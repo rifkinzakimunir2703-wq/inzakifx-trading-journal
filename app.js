@@ -25,7 +25,7 @@
     if(cfg()){ window.__INZAKI_SUPABASE__={url:getUrl(),key:key()}; return window.supabase.createClient(getUrl(),key()); }
     return null;
   }
-  let sb=null, user=null, ownerId=null, trades=[], accounts=[], payouts=[], eaTrades=[];
+  let sb=null, user=null, ownerId=null, trades=[], accounts=[], payouts=[], eaTrades=[], eaSnapshots=[];
   let monthCursor=new Date(); let editingAccount=null; let eaTimer=null;
 
   function show(id,on=true){ const el=$(id); if(el) el.classList.toggle('hidden',!on); }
@@ -152,17 +152,25 @@
 
   async function loadEA(){
     if(!sb){return}
-    const {data,error}=await sb.from('ea_trades_public').select('*').order('time',{ascending:false}).limit(500);
-    if(error){
+    const [tradeRes,snapRes]=await Promise.all([
+      sb.from('ea_trades_public').select('*').order('time',{ascending:false}).limit(500),
+      sb.from('ea_account_snapshots_public').select('*').order('time',{ascending:false}).limit(500)
+    ]);
+    if(tradeRes.error){
       eaTrades=[];
-      $('eaBody').innerHTML=`<tr><td colspan="8" class="muted center">EA table belum siap: ${esc(error.message)}</td></tr>`;
-      $('eaAccounts').innerHTML='<div class="emptyState">Tidak bisa membaca data EA. Pastikan tabel ea_trades_public sudah dibuat.</div>';
-      return;
-    }
-    eaTrades=data||[];
+      $('eaBody').innerHTML=`<tr><td colspan="8" class="muted center">EA table belum siap: ${esc(tradeRes.error.message)}</td></tr>`;
+    } else eaTrades=tradeRes.data||[];
+    if(snapRes.error){
+      eaSnapshots=[];
+      console.warn('EA snapshots:',snapRes.error.message);
+    } else eaSnapshots=snapRes.data||[];
     renderEA();
     if(eaTimer)clearTimeout(eaTimer);
     eaTimer=setTimeout(()=>{if(!$('ea').classList.contains('hidden'))loadEA()},15000)
+  }
+
+  function latestSnapshot(account){
+    return eaSnapshots.find(x=>String(x.account??'').trim()===String(account??'').trim())||null;
   }
 
   function eaAccountKey(x){return String(x.account??'').trim() || 'Unknown';}
@@ -173,6 +181,12 @@
       if(!map.has(key))map.set(key,{account:key,broker:x.broker||'—',symbol:x.symbol||'—',last:x.time?new Date(x.time).getTime():0,rows:[]});
       const a=map.get(key); a.rows.push(x);
       const tm=x.time?new Date(x.time).getTime():0; if(tm>a.last){a.last=tm;a.broker=x.broker||a.broker;a.symbol=x.symbol||a.symbol}
+    }
+    for(const x of eaSnapshots){
+      const key=eaAccountKey(x);
+      if(!map.has(key))map.set(key,{account:key,broker:x.broker||'—',symbol:x.symbol||'—',last:x.time?new Date(x.time).getTime():0,rows:[]});
+      const a=map.get(key); const tm=x.time?new Date(x.time).getTime():0;
+      if(tm>a.last){a.last=tm;a.broker=x.broker||a.broker;a.symbol=x.symbol||a.symbol}
     }
     return [...map.values()].sort((a,b)=>b.last-a.last);
   }
@@ -190,13 +204,19 @@
     if(!list.length){$('eaAccounts').innerHTML='<div class="emptyState">Belum ada akun EA. Setelah EA mengirim trade, akun MT5 akan muncul otomatis di sini.</div>';return}
     $('eaAccounts').innerHTML=list.map(a=>{
       const closed=a.rows.filter(isClosedEA); const st=stats(closed.map(x=>({pl:Number(x.profit||0)})));
-      const last=a.last?Date.now()-a.last:Infinity; const online=last<=10*60*1000;
+      const snap=latestSnapshot(a.account);
+      const snapTime=snap?.time?new Date(snap.time).getTime():0;
+      const activity=Math.max(a.last||0,snapTime);
+      const online=activity>0 && Date.now()-activity<=3*60*1000;
       const pnl=closed.reduce((z,x)=>z+Number(x.profit||0),0);
       const lastTrade=a.rows[0];
+      const balance=snap?Number(snap.balance||0):0, equity=snap?Number(snap.equity||0):0;
+      const ddPct=(balance>0&&equity<balance)?((balance-equity)/balance*100):0;
       return `<article class="eaAccountCard ${online?'eaOnline':'eaOffline'}" data-ea-account-card="${esc(a.account)}">
-        <div class="eaAccountTop"><div><div class="eaAccountName">${esc(a.account)}</div><small>${esc(a.broker)} · ${esc(a.symbol)}</small></div><span class="eaStatus ${online?'online':'offline'}"><i></i>${online?'ONLINE':'OFFLINE'}</span></div>
-        <div class="eaMiniGrid"><div><small>Trades</small><b>${closed.length}</b></div><div><small>Win Rate</small><b>${st.wr.toFixed(1)}%</b></div><div><small>P/L</small><b class="${pnl>=0?'positive':'negative'}">${money(pnl)}</b></div><div><small>PF</small><b>${st.pf.toFixed(2)}</b></div></div>
-        <div class="eaAccountFoot"><span>Last: ${lastTrade?.event?esc(lastTrade.event):'—'}</span><span>${a.last?new Date(a.last).toLocaleString('id-ID'):'—'}</span></div>
+        <div class="eaAccountTop"><div><div class="eaAccountName">${esc(a.account)}</div><small>${esc(snap?.broker||a.broker)} · ${esc(snap?.symbol||a.symbol)}</small></div><span class="eaStatus ${online?'online':'offline'}"><i></i>${online?'ONLINE':'OFFLINE'}</span></div>
+        <div class="eaMiniGrid"><div><small>Balance</small><b>${money(balance)}</b></div><div><small>Equity</small><b>${money(equity)}</b></div><div><small>Today P/L</small><b class="${Number(snap?.today_pl||0)>=0?'positive':'negative'}">${money(snap?.today_pl||0)}</b></div><div><small>Floating</small><b class="${Number(snap?.floating_profit||0)>=0?'positive':'negative'}">${money(snap?.floating_profit||0)}</b></div><div><small>Trades</small><b>${closed.length}</b></div><div><small>Win Rate</small><b>${st.wr.toFixed(1)}%</b></div><div><small>PF</small><b>${st.pf.toFixed(2)}</b></div><div><small>DD Est.</small><b>${ddPct.toFixed(1)}%</b></div></div>
+        <div class="eaMLLine"><span>ML ${(Number(snap?.ml_probability||0)*100).toFixed(1)}%</span><span>Risk ×${Number(snap?.adaptive_risk||1).toFixed(2)}</span><span>Samples ${Number(snap?.ml_samples||0)}</span><span>WF ${snap?.wf_enabled?'ON':'OFF'} ${Number(snap?.wf_valid_folds||0)}/${Number(snap?.wf_folds||0)}</span></div>
+        <div class="eaAccountFoot"><span>Last: ${lastTrade?.event?esc(lastTrade.event):esc(snap?.event||'—')}</span><span>${activity?new Date(activity).toLocaleString('id-ID'):'—'}</span></div>
       </article>`
     }).join('')
   }
@@ -204,7 +224,9 @@
   function renderEA(){
     const closed=eaTrades.filter(isClosedEA); const s=stats(closed.map(x=>({pl:Number(x.profit||0)})));
     setText('eaTrades',closed.length);setText('eaWR',s.wr.toFixed(1)+'%');setText('eaPL',money(s.net));setText('eaPF',s.pf.toFixed(2));
-    if(eaTrades[0]){const x=eaTrades[0];setText('eaLast',x.event||'—');setText('eaSide',x.type||'—');setText('eaSymbol',x.symbol||'—');setText('eaTime',x.time?new Date(x.time).toLocaleString('id-ID'):'—');setText('eaBadge',x.event||'LIVE');document.querySelector('.live')?.classList.add('online');setText('liveText','ONLINE')}
+    const latest=[...eaTrades,...eaSnapshots].filter(x=>x?.time).sort((a,b)=>new Date(b.time)-new Date(a.time))[0];
+    if(latest){setText('eaLast',latest.event||'—');setText('eaSide',latest.type||'—');setText('eaSymbol',latest.symbol||'—');setText('eaTime',new Date(latest.time).toLocaleString('id-ID'));setText('eaBadge',latest.event||'LIVE');document.querySelector('.live')?.classList.add('online');setText('liveText','ONLINE')}
+    else {document.querySelector('.live')?.classList.remove('online');setText('liveText','WAITING');}
     renderEAAccounts();
     const filter=$('eaAccountFilter')?.value||''; const rows=filter?eaTrades.filter(x=>eaAccountKey(x)===filter):eaTrades;
     setText('eaFilterLabel',filter?`AKUN ${filter}`:'SEMUA AKUN');

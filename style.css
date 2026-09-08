@@ -18,3 +18,8 @@
 .eaAccountFoot{display:flex;justify-content:space-between;gap:10px;margin-top:13px;padding-top:11px;border-top:1px solid #202a35;color:#7f8b9a;font-size:11px}
 .emptyState{padding:18px;border:1px dashed #303a46;border-radius:13px;color:#8d99a8;text-align:center}
 @media(max-width:700px){.eaAccountGrid{grid-template-columns:1fr}.eaFilter{width:100%;max-width:none}.sectionHead{flex-wrap:wrap}.eaMiniGrid{grid-template-columns:repeat(2,1fr)}.eaAccountFoot{flex-direction:column}}
+
+/* V7 live EA account snapshot */
+.eaMLLine{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px;padding-top:9px;border-top:1px solid var(--border);font-size:12px;color:var(--muted)}
+.eaMLLine span{padding:5px 8px;border:1px solid var(--border);border-radius:999px;background:rgba(255,255,255,.02)}
+@media(max-width:700px){.eaMLLine{gap:5px}.eaMLLine span{font-size:11px;padding:4px 7px}}
