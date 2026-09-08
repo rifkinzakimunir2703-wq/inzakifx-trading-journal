@@ -3,8 +3,28 @@
   const $ = id => document.getElementById(id);
   const money = n => `${Number(n||0)<0?'-':''}$${Math.abs(Number(n)||0).toFixed(2)}`;
   const esc = v => String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
-  const key = () => window.SUPABASE_PUBLISHABLE_KEY || window.SUPABASE_ANON_KEY || '';
-  const cfg = () => window.SUPABASE_URL && key() && window.supabase;
+  // Support BOTH styles of config.js: classic `const` globals and `window.*` globals.
+  const getUrl = () => (typeof SUPABASE_URL !== 'undefined' ? SUPABASE_URL : (window.SUPABASE_URL || ''));
+  const getPublishable = () => (typeof SUPABASE_PUBLISHABLE_KEY !== 'undefined' ? SUPABASE_PUBLISHABLE_KEY : (window.SUPABASE_PUBLISHABLE_KEY || ''));
+  const getAnon = () => (typeof SUPABASE_ANON_KEY !== 'undefined' ? SUPABASE_ANON_KEY : (window.SUPABASE_ANON_KEY || ''));
+  const key = () => getPublishable() || getAnon() || '';
+  const cfg = () => getUrl() && key() && window.supabase;
+  async function makeClient(url, k){ return window.supabase.createClient(url, k); }
+  async function connectSupabase(){
+    if(window.supabase && Array.isArray(window.INZAKI_SUPABASE_CANDIDATES)){
+      for(const c of window.INZAKI_SUPABASE_CANDIDATES){
+        try{
+          const client=await makeClient(c.url,c.publishable);
+          const probe=await client.from('portal_public_owner').select('owner_id').eq('id',true).maybeSingle();
+          if(!probe.error){ window.__INZAKI_SUPABASE__={url:c.url,key:c.publishable}; return client; }
+          const probe2=await client.from('trades').select('id',{count:'exact',head:true});
+          if(!probe2.error){ window.__INZAKI_SUPABASE__={url:c.url,key:c.publishable}; return client; }
+        }catch(e){}
+      }
+    }
+    if(cfg()){ window.__INZAKI_SUPABASE__={url:getUrl(),key:key()}; return window.supabase.createClient(getUrl(),key()); }
+    return null;
+  }
   let sb=null, user=null, ownerId=null, trades=[], accounts=[], payouts=[], eaTrades=[];
   let monthCursor=new Date(); let editingAccount=null; let eaTimer=null;
 
@@ -15,9 +35,9 @@
   function fail(text){console.error(text);setStatus(text);}
 
   async function init(){
-    if(!cfg()){ fail('Supabase belum terhubung. Pastikan config.js berisi SUPABASE_URL dan SUPABASE_PUBLISHABLE_KEY.'); bindUI(); return; }
-    sb=window.supabase.createClient(window.SUPABASE_URL,key());
     bindUI();
+    sb=await connectSupabase();
+    if(!sb){ fail('Supabase belum terhubung. Pastikan config.js tersedia dan berisi konfigurasi Supabase yang benar.'); return; }
     try{
       const {data,error}=await sb.auth.getSession();
       if(error) throw error;
@@ -76,6 +96,7 @@
   function updateHeader(){show('loginOpen',!user);show('logout',!!user)}
   function updateAdminUI(){document.querySelectorAll('.adminOnly').forEach(e=>e.classList.toggle('hidden',!user));}
 
+  window.openPage = openPage;
   function openPage(id){
     document.querySelectorAll('.page').forEach(p=>p.classList.add('hidden'));
     document.querySelectorAll('.navBtn').forEach(b=>b.classList.toggle('active',b.dataset.page===id));

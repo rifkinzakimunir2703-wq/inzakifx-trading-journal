@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#080b10"><title>INZAKI TRADE — Workspace</title>
-<link rel="stylesheet" href="style.css?v=20260909">
+<link rel="stylesheet" href="style.css?v=INZAKI_V5_20260910">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="config.js"></script>
+<script src="config.js?v=INZAKI_V5_20260910"></script>
 </head>
 <body>
 <header class="header">
@@ -63,5 +63,5 @@
 <div id="accountModal" class="modal hidden"><div class="modalBox"><div class="sectionHead"><h2>Prop Firm Account</h2><button data-close="accountModal" class="iconBtn" type="button">×</button></div><form id="accountForm" class="formGrid"><input id="aFirm" placeholder="Prop Firm" required><input id="aName" placeholder="Nama akun / ID" required><input id="aSize" type="number" step="any" placeholder="Account Size $" required><input id="aFee" type="number" step="any" placeholder="Purchase Fee $" value="0"><select id="aStatus"><option>Phase 1</option><option>Phase 2</option><option>Funded</option><option>Payout</option><option>Failed</option><option>Closed</option></select><input id="aTarget" type="number" step="any" value="6" placeholder="Target %"><input id="aDD" type="number" step="any" value="4" placeholder="Max DD %"><input id="aDaily" type="number" step="any" value="2" placeholder="Daily Loss %"><input id="aCons" type="number" step="any" value="20" placeholder="Consistency %"><input id="aStart" type="date"><textarea id="aNotes" placeholder="Catatan"></textarea><button class="primary full" type="submit">Simpan Akun</button></form><p id="accountMsg" class="msg"></p></div></div>
 <div id="payoutModal" class="modal hidden"><div class="modalBox small"><div class="sectionHead"><h2>Tambah Payout</h2><button data-close="payoutModal" class="iconBtn" type="button">×</button></div><form id="payoutForm"><select id="pAccount" required><option value="">Pilih akun</option></select><input id="pAmount" type="number" step="any" placeholder="Payout $" required><input id="pDate" type="date" required><select id="pStatus"><option>Paid</option><option>Pending</option><option>Rejected</option></select><textarea id="pNote" placeholder="Catatan"></textarea><button class="primary" type="submit">Simpan Payout</button></form><p id="payoutMsg" class="msg"></p></div></div>
 <div id="errorModal" class="modal hidden"><div class="modalBox small"><div class="sectionHead"><h2>Portal Status</h2><button data-close="errorModal" class="iconBtn" type="button">×</button></div><p id="errorText" class="msg"></p><button data-close="errorModal" class="secondary full" type="button">Tutup</button></div></div>
-<script src="app.js?v=20260909"></script>
+<script src="app.js?v=INZAKI_V5_20260910"></script>
 </body></html>
