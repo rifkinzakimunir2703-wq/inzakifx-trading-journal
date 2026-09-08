@@ -150,8 +150,66 @@
   async function changeStatus(id){const a=accounts.find(x=>x.id===id);if(!a)return;const s=prompt('Status: Phase 1, Phase 2, Funded, Payout, Failed, Closed',a.status||'Phase 1');if(!s)return;const {error}=await sb.from('prop_accounts').update({status:s}).eq('id',id).eq('user_id',user.id);if(error)alert(error.message);else await loadAll(true)}
   async function removeAccount(id){if(!confirm('Hapus akun ini? Data trade tidak ikut dihapus.'))return;const {error}=await sb.from('prop_accounts').delete().eq('id',id).eq('user_id',user.id);if(error)alert(error.message);else await loadAll(true)}
 
-  async function loadEA(){if(!sb){return}const {data,error}=await sb.from('ea_trades_public').select('*').order('time',{ascending:false}).limit(500);if(error){$('eaBody').innerHTML=`<tr><td colspan="8" class="muted center">EA table belum siap: ${esc(error.message)}</td></tr>`;return}eaTrades=data||[];renderEA();if(eaTimer)clearTimeout(eaTimer);eaTimer=setTimeout(()=>{if(!$('ea').classList.contains('hidden'))loadEA()},15000)}
-  function renderEA(){const closed=eaTrades.filter(x=>String(x.event||'').toLowerCase().includes('close')||String(x.event||'').toLowerCase().includes('result'));const s=stats(closed.map(x=>({pl:x.profit})));setText('eaTrades',closed.length);setText('eaWR',s.wr.toFixed(1)+'%');setText('eaPL',money(s.net));setText('eaPF',s.pf.toFixed(2));if(eaTrades[0]){const x=eaTrades[0];setText('eaLast',x.event||'—');setText('eaSide',x.type||'—');setText('eaSymbol',x.symbol||'—');setText('eaTime',x.time?new Date(x.time).toLocaleString('id-ID'):'—');setText('eaBadge',x.event||'LIVE');document.querySelector('.live')?.classList.add('online');setText('liveText','ONLINE')}$('eaBody').innerHTML=eaTrades.map(x=>`<tr><td>${x.time?esc(new Date(x.time).toLocaleString('id-ID')):'—'}</td><td>${esc(x.event)}</td><td>${esc(x.symbol)}</td><td>${esc(x.type)}</td><td>${x.price??'—'}</td><td>${x.sl??'—'}</td><td>${x.tp??'—'}</td><td class="${Number(x.profit)>=0?'positive':'negative'}">${money(x.profit)}</td></tr>`).join('')||'<tr><td colspan="8" class="muted center">Belum ada data EA.</td></tr>'}
+  async function loadEA(){
+    if(!sb){return}
+    const {data,error}=await sb.from('ea_trades_public').select('*').order('time',{ascending:false}).limit(500);
+    if(error){
+      eaTrades=[];
+      $('eaBody').innerHTML=`<tr><td colspan="8" class="muted center">EA table belum siap: ${esc(error.message)}</td></tr>`;
+      $('eaAccounts').innerHTML='<div class="emptyState">Tidak bisa membaca data EA. Pastikan tabel ea_trades_public sudah dibuat.</div>';
+      return;
+    }
+    eaTrades=data||[];
+    renderEA();
+    if(eaTimer)clearTimeout(eaTimer);
+    eaTimer=setTimeout(()=>{if(!$('ea').classList.contains('hidden'))loadEA()},15000)
+  }
+
+  function eaAccountKey(x){return String(x.account??'').trim() || 'Unknown';}
+  function eaAccountsData(){
+    const map=new Map();
+    for(const x of eaTrades){
+      const key=eaAccountKey(x);
+      if(!map.has(key))map.set(key,{account:key,broker:x.broker||'—',symbol:x.symbol||'—',last:x.time?new Date(x.time).getTime():0,rows:[]});
+      const a=map.get(key); a.rows.push(x);
+      const tm=x.time?new Date(x.time).getTime():0; if(tm>a.last){a.last=tm;a.broker=x.broker||a.broker;a.symbol=x.symbol||a.symbol}
+    }
+    return [...map.values()].sort((a,b)=>b.last-a.last);
+  }
+
+  function isClosedEA(x){const e=String(x.event||'').toLowerCase();return e.includes('close')||e.includes('result')||e.includes('closed');}
+
+  function renderEAAccounts(){
+    const list=eaAccountsData();
+    const filter=$('eaAccountFilter')?.value||'';
+    if($('eaAccountFilter')){
+      const old=filter;
+      $('eaAccountFilter').innerHTML='<option value="">Semua akun</option>'+list.map(a=>`<option value="${esc(a.account)}">${esc(a.account)}${a.broker&&a.broker!=='—'?' · '+esc(a.broker):''}</option>`).join('');
+      $('eaAccountFilter').value=list.some(a=>a.account===old)?old:'';
+    }
+    if(!list.length){$('eaAccounts').innerHTML='<div class="emptyState">Belum ada akun EA. Setelah EA mengirim trade, akun MT5 akan muncul otomatis di sini.</div>';return}
+    $('eaAccounts').innerHTML=list.map(a=>{
+      const closed=a.rows.filter(isClosedEA); const st=stats(closed.map(x=>({pl:Number(x.profit||0)})));
+      const last=a.last?Date.now()-a.last:Infinity; const online=last<=10*60*1000;
+      const pnl=closed.reduce((z,x)=>z+Number(x.profit||0),0);
+      const lastTrade=a.rows[0];
+      return `<article class="eaAccountCard ${online?'eaOnline':'eaOffline'}" data-ea-account-card="${esc(a.account)}">
+        <div class="eaAccountTop"><div><div class="eaAccountName">${esc(a.account)}</div><small>${esc(a.broker)} · ${esc(a.symbol)}</small></div><span class="eaStatus ${online?'online':'offline'}"><i></i>${online?'ONLINE':'OFFLINE'}</span></div>
+        <div class="eaMiniGrid"><div><small>Trades</small><b>${closed.length}</b></div><div><small>Win Rate</small><b>${st.wr.toFixed(1)}%</b></div><div><small>P/L</small><b class="${pnl>=0?'positive':'negative'}">${money(pnl)}</b></div><div><small>PF</small><b>${st.pf.toFixed(2)}</b></div></div>
+        <div class="eaAccountFoot"><span>Last: ${lastTrade?.event?esc(lastTrade.event):'—'}</span><span>${a.last?new Date(a.last).toLocaleString('id-ID'):'—'}</span></div>
+      </article>`
+    }).join('')
+  }
+
+  function renderEA(){
+    const closed=eaTrades.filter(isClosedEA); const s=stats(closed.map(x=>({pl:Number(x.profit||0)})));
+    setText('eaTrades',closed.length);setText('eaWR',s.wr.toFixed(1)+'%');setText('eaPL',money(s.net));setText('eaPF',s.pf.toFixed(2));
+    if(eaTrades[0]){const x=eaTrades[0];setText('eaLast',x.event||'—');setText('eaSide',x.type||'—');setText('eaSymbol',x.symbol||'—');setText('eaTime',x.time?new Date(x.time).toLocaleString('id-ID'):'—');setText('eaBadge',x.event||'LIVE');document.querySelector('.live')?.classList.add('online');setText('liveText','ONLINE')}
+    renderEAAccounts();
+    const filter=$('eaAccountFilter')?.value||''; const rows=filter?eaTrades.filter(x=>eaAccountKey(x)===filter):eaTrades;
+    setText('eaFilterLabel',filter?`AKUN ${filter}`:'SEMUA AKUN');
+    $('eaBody').innerHTML=rows.map(x=>`<tr><td>${x.time?esc(new Date(x.time).toLocaleString('id-ID')):'—'}</td><td><b>${esc(eaAccountKey(x))}</b></td><td>${esc(x.broker||'—')}</td><td>${esc(x.event||'—')}</td><td>${esc(x.symbol||'—')}</td><td>${esc(x.type||'—')}</td><td>${x.price??'—'}</td><td class="${Number(x.profit)>=0?'positive':'negative'}">${money(x.profit)}</td></tr>`).join('')||'<tr><td colspan="8" class="muted center">Belum ada data EA untuk akun ini.</td></tr>'
+  }
 
   function exportCSV(){const headers=['trade_date','symbol','side','entry','exit','risk','pl','strategy','timeframe','session','notes'];const rows=trades.map(t=>headers.map(h=>`"${String(t[h]??'').replaceAll('"','""')}"`).join(','));const blob=new Blob([[headers.join(','),...rows].join('\n')],{type:'text/csv'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='inzakitrade-journal.csv';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),500)}
 
@@ -161,7 +219,7 @@
     document.querySelectorAll('[data-close]').forEach(b=>b.addEventListener('click',()=>show(b.dataset.close,false)));
     document.querySelectorAll('.navBtn').forEach(b=>b.addEventListener('click',()=>openPage(b.dataset.page)));
     ['fAccount','fStrategy','fTF','fSession','fFrom','fTo'].forEach(id=>$(id)?.addEventListener('change',renderPerformance));$('fReset')?.addEventListener('click',()=>{['fAccount','fStrategy','fTF','fSession','fFrom','fTo'].forEach(id=>{if($(id))$(id).value=''});renderPerformance()});
-    $('search')?.addEventListener('input',renderJournal);$('export')?.addEventListener('click',exportCSV);['quickTrade','journalAdd'].forEach(id=>$(id)?.addEventListener('click',()=>{fillAccountSelects();show('tradeModal',true)}));
+    $('search')?.addEventListener('input',renderJournal);$('eaAccountFilter')?.addEventListener('change',renderEA);$('export')?.addEventListener('click',exportCSV);['quickTrade','journalAdd'].forEach(id=>$(id)?.addEventListener('click',()=>{fillAccountSelects();show('tradeModal',true)}));
     $('tradeForm')?.addEventListener('submit',saveTrade);$('addAccount')?.addEventListener('click',()=>{editingAccount=null;$('accountForm').reset();show('accountModal',true)});$('accountForm')?.addEventListener('submit',saveAccount);$('addPayout')?.addEventListener('click',()=>{fillAccountSelects();show('payoutModal',true)});$('payoutForm')?.addEventListener('submit',savePayout);
     $('prevMonth')?.addEventListener('click',()=>{monthCursor.setMonth(monthCursor.getMonth()-1);renderCalendar()});$('nextMonth')?.addEventListener('click',()=>{monthCursor.setMonth(monthCursor.getMonth()+1);renderCalendar()});$('todayMonth')?.addEventListener('click',()=>{monthCursor=new Date();renderCalendar()});
     document.addEventListener('click',e=>{const d=e.target.closest('[data-delete-trade]');if(d)deleteTrade(d.dataset.deleteTrade);const ed=e.target.closest('[data-edit-account]');if(ed)editAccount(ed.dataset.editAccount);const st=e.target.closest('[data-status-account]');if(st)changeStatus(st.dataset.statusAccount);const del=e.target.closest('[data-delete-account]');if(del)removeAccount(del.dataset.deleteAccount);const day=e.target.closest('[data-date]');if(day){const date=day.dataset.date;$('fFrom').value=date;$('fTo').value=date;openPage('performance')}});
