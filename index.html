@@ -59,6 +59,7 @@
       <button type="button" class="navBtn" data-page="payoutsPage" onclick="openPage(\'payoutsPage\');return false;">💰 Payouts</button>
       <button type="button" class="navBtn" data-page="calendarPage" onclick="openPage(\'calendarPage\');return false;">📅 Calendar</button>
       <button type="button" class="navBtn" data-page="journalPage" onclick="openPage(\'journalPage\');return false;">📒 Trading Journal</button>
+      <button type="button" class="navBtn eaNavBtn" data-page="eaPage" onclick="openPage('eaPage');return false;">🤖 EA Monitor</button>
     </nav>
 
     <section id="globalPage" class="page">
@@ -197,6 +198,19 @@
       <div class="card"><small>Best Day</small><strong id="bestDay">$0.00</strong></div>
     </div>
 
+
+    <section id="eaPage" class="page hidden">
+      <div class="hero"><div><div class="eyebrow">EA WORKSPACE</div><h1>InzakiTrade EA Monitor</h1><p class="muted">Data EA masuk otomatis dari MT5 melalui webhook. Public view only.</p></div><div class="eaLiveBox"><span id="eaPortalStatusDot" class="eaDot offline"></span><b id="eaPortalStatus">WAITING</b><small id="eaPortalUpdated">Belum ada event</small></div></div>
+      <section class="dashSection"><div class="dashSectionHead"><div><span class="dashIcon">🤖</span><div><h2>EA Performance</h2><p>Ringkasan trade yang dikirim EA.</p></div></div><span class="dashTag">LIVE</span></div><div class="cards globalCards eaCards">
+        <div class="card"><small>Total EA Trades</small><strong id="eaTotalTrades">0</strong></div><div class="card"><small>Win Rate</small><strong id="eaWinRate">0%</strong></div><div class="card"><small>Net P/L</small><strong id="eaNetPL">$0.00</strong></div><div class="card"><small>Profit Factor</small><strong id="eaPF">0.00</strong></div><div class="card"><small>Gross Profit</small><strong id="eaGrossProfit">$0.00</strong></div><div class="card"><small>Gross Loss</small><strong id="eaGrossLoss">$0.00</strong></div>
+      </div></section>
+      <div class="eaGrid2">
+        <section class="panel"><div class="sectionTitle"><h2>🧠 ML / Walk-Forward</h2><span class="pill">V4</span></div><div class="eaMetricGrid"><div><small>Model</small><b>Logistic Regression</b></div><div><small>Learning</small><b>Online + Historical</b></div><div><small>Walk-Forward</small><b>Train → OOS</b></div><div><small>Risk</small><b>Adaptive</b></div></div><p class="muted eaNote">EA V4 sudah membawa probability, samples, filter, adaptive risk dan Walk-Forward. Portal siap menampilkan snapshot ML jika EA mengirim event heartbeat/status.</p></section>
+        <section class="panel"><div class="sectionTitle"><h2>⚡ EA Status</h2><span id="eaLastEventBadge" class="pill">WAITING</span></div><div class="eaStatusList"><div><span>Symbol</span><b id="eaSymbol">XAUUSD</b></div><div><span>Timeframe</span><b>M5</b></div><div><span>Session</span><b>Asia 07:00–11:00 WIB</b></div><div><span>Last Event</span><b id="eaLastEvent">—</b></div><div><span>Last Side</span><b id="eaLastSide">—</b></div><div><span>Today Closed</span><b id="eaTodayTrades">0</b></div></div></section>
+      </div>
+      <section class="panel"><div class="sectionTitle"><h2>📒 EA Trade Stream</h2><span class="muted">Auto refresh 15s</span></div><div class="tableWrap"><table class="eaTable"><thead><tr><th>Time</th><th>Event</th><th>Symbol</th><th>Side</th><th>Price</th><th>SL</th><th>TP</th><th>P/L</th></tr></thead><tbody id="eaTradeBody"><tr><td colspan="8" class="muted">Belum ada data EA.</td></tr></tbody></table></div></section>
+      <section class="panel"><div class="sectionTitle"><h2>📅 EA Daily Result</h2><span class="muted">35 hari terakhir</span></div><div id="eaDailyGrid" class="eaDailyGrid"></div></section>
+    </section>
     <section id="propPanel" class="panel hidden">
       <div class="sectionTitle"><h2>🎯 Prop Firm Mode</h2><span id="propStatus">Evaluation</span></div>
       <div class="propGrid">
