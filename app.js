@@ -1,4 +1,9 @@
-const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+const SUPABASE_KEY =
+  (typeof SUPABASE_PUBLISHABLE_KEY !== "undefined" && SUPABASE_PUBLISHABLE_KEY) ||
+  (typeof SUPABASE_ANON_KEY !== "undefined" && SUPABASE_ANON_KEY) || "";
+const sb = (typeof window.supabase !== "undefined" && typeof SUPABASE_URL !== "undefined" && SUPABASE_URL && SUPABASE_KEY)
+  ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY)
+  : null;
 let currentUser = null, trades = [], authMode = "login", accounts = [], payouts = [];
 let publicMode = false, publicOwnerId = null;
 let prop = {account:5000,targetPct:6,maxDDPct:4,dailyLossPct:2,consistencyPct:20,buffer:100};
@@ -19,7 +24,7 @@ const money = n => `${n < 0 ? "-" : ""}$${Math.abs(Number(n)||0).toFixed(2)}`;
 function show(id, yes=true){ $(id).classList.toggle("hidden", !yes); }
 
 async function init(){
-  if(!SUPABASE_PUBLISHABLE_KEY || SUPABASE_PUBLISHABLE_KEY.includes("PASTE_")){
+  if(!sb || !SUPABASE_KEY || SUPABASE_KEY.includes("PASTE_")){
     $("authMsg").textContent = "Masukkan Supabase Publishable Key di config.js terlebih dahulu.";
     return;
   }
@@ -102,7 +107,7 @@ function exitApp(){
 }
 
 function setPublicNav(isAdmin){
-  const allowed=["performancePage","journalPage","calendarPage"];
+  const allowed=["performancePage","journalPage","calendarPage","eaPage"];
   document.querySelectorAll(".navBtn").forEach(btn=>{
     const page=btn.dataset.page; btn.classList.toggle("hidden",!isAdmin && !allowed.includes(page));
   });
@@ -420,6 +425,7 @@ function openPage(pageId){
   if(pageId==="payoutsPage"){renderPayouts();fillPayoutAccounts();}
   if(pageId==="calendarPage"){renderCalendar();}
   if(pageId==="journalPage"){render();}
+  if(pageId==="eaPage"){loadEATradesPortal();}
   window.scrollTo({top:0,behavior:"smooth"});
 }
 window.openPage=openPage;
@@ -526,4 +532,14 @@ document.querySelectorAll(".navBtn").forEach(btn=>{
   btn.addEventListener("click",e=>{e.preventDefault();openPage(btn.dataset.page);});
 });
 window.addEventListener("resize",()=>{if(!$("appView")?.classList.contains("hidden")){drawGlobalEquity();drawPerformanceChart(getPerfTrades());}});
-\n\n/* === INZAKITRADE EA PORTAL UPGRADE === */\nlet eaTradesPortal=[];\nfunction eaMoney(v){return (Number(v)||0).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});}\nfunction eaSigned(v){let n=Number(v)||0;return (n>=0?"+":"-")+eaMoney(Math.abs(n));}\nfunction eaSafe(v){return String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':'&quot;',"'":'&#39;'}[m]));}\nasync function loadEATradesPortal(){if(typeof sb==="undefined"||!sb)return;try{const {data,error}=await sb.from("ea_trades_public").select("*").order("time",{ascending:false}).limit(500);if(error){console.warn("EA portal:",error.message);return;}eaTradesPortal=data||[];renderEAPortal();}catch(e){console.warn("EA portal:",e);}}\nfunction renderEAPortal(){const closes=eaTradesPortal.filter(x=>String(x.event||"").toLowerCase()==="close");const vals=closes.map(x=>Number(x.profit||0)+Number(x.swap||0)+Number(x.commission||0));const wins=vals.filter(x=>x>0),losses=vals.filter(x=>x<0),net=vals.reduce((a,b)=>a+b,0),gp=wins.reduce((a,b)=>a+b,0),gl=Math.abs(losses.reduce((a,b)=>a+b,0));const set=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v;};set("eaTotalTrades",closes.length);set("eaWinRate",(closes.length?wins.length/closes.length*100:0).toFixed(1)+"%");set("eaNetPL",eaSigned(net));set("eaPF",gl?(gp/gl).toFixed(2):"0.00");set("eaGrossProfit",eaMoney(gp));set("eaGrossLoss",gl?"-"+eaMoney(gl):eaMoney(0));const latest=eaTradesPortal[0];if(latest){set("eaLastEvent",latest.event||"—");set("eaLastSide",latest.type||latest.side||"—");set("eaSymbol",latest.symbol||"XAUUSD");set("eaLastEventBadge",String(latest.event||"EVENT").toUpperCase());set("eaPortalUpdated",latest.time||"—");const dot=document.getElementById("eaPortalStatusDot");if(dot)dot.className="eaDot online";set("eaPortalStatus","ONLINE");}const today=new Date().toLocaleDateString("en-CA",{timeZone:"Asia/Jakarta"});set("eaTodayTrades",closes.filter(x=>String(x.time||"").slice(0,10)===today).length);const body=document.getElementById("eaTradeBody");if(body)body.innerHTML=eaTradesPortal.slice(0,50).map(x=>`<tr><td>${eaSafe(x.time)}</td><td>${eaSafe(x.event)}</td><td>${eaSafe(x.symbol||"—")}</td><td>${eaSafe(x.type||"—")}</td><td>${x.price==null?"—":eaMoney(x.price)}</td><td>${x.sl==null?"—":eaMoney(x.sl)}</td><td>${x.tp==null?"—":eaMoney(x.tp)}</td><td>${String(x.event).toLowerCase()==="close"?eaSigned(Number(x.profit||0)+Number(x.swap||0)+Number(x.commission||0)):"—"}</td></tr>`).join("")||`<tr><td colspan="8" class="muted">Belum ada data EA.</td></tr>`;const daily={};closes.forEach(x=>{let d=String(x.time||"").slice(0,10);daily[d]=(daily[d]||0)+Number(x.profit||0)+Number(x.swap||0)+Number(x.commission||0)});const ds=Object.keys(daily).sort().slice(-35);const dg=document.getElementById("eaDailyGrid");if(dg)dg.innerHTML=ds.map(d=>`<div class="eaDay ${daily[d]>0?"eaPlus":daily[d]<0?"eaMinus":"eaFlat"}"><small>${eaSafe(d)}</small><b>${eaSigned(daily[d])}</b></div>`).join("")||`<span class="muted">Belum ada hasil harian.</span>`;}\nconst _inzakiOriginalOpenPage=window.openPage;window.openPage=function(pageId){if(typeof _inzakiOriginalOpenPage==="function")_inzakiOriginalOpenPage(pageId);if(pageId==="eaPage")loadEATradesPortal();};setInterval(loadEATradesPortal,15000);loadEATradesPortal();\n
+
+
+/* === INZAKITRADE EA PORTAL UPGRADE === */
+let eaTradesPortal=[];
+function eaMoney(v){return (Number(v)||0).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});}
+function eaSigned(v){let n=Number(v)||0;return (n>=0?"+":"-")+eaMoney(Math.abs(n));}
+function eaSafe(v){return String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':'&quot;',"'":'&#39;'}[m]));}
+async function loadEATradesPortal(){if(typeof sb==="undefined"||!sb)return;try{const {data,error}=await sb.from("ea_trades_public").select("*").order("time",{ascending:false}).limit(500);if(error){console.warn("EA portal:",error.message);return;}eaTradesPortal=data||[];renderEAPortal();}catch(e){console.warn("EA portal:",e);}}
+function renderEAPortal(){const closes=eaTradesPortal.filter(x=>String(x.event||"").toLowerCase()==="close");const vals=closes.map(x=>Number(x.profit||0)+Number(x.swap||0)+Number(x.commission||0));const wins=vals.filter(x=>x>0),losses=vals.filter(x=>x<0),net=vals.reduce((a,b)=>a+b,0),gp=wins.reduce((a,b)=>a+b,0),gl=Math.abs(losses.reduce((a,b)=>a+b,0));const set=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v;};set("eaTotalTrades",closes.length);set("eaWinRate",(closes.length?wins.length/closes.length*100:0).toFixed(1)+"%");set("eaNetPL",eaSigned(net));set("eaPF",gl?(gp/gl).toFixed(2):"0.00");set("eaGrossProfit",eaMoney(gp));set("eaGrossLoss",gl?"-"+eaMoney(gl):eaMoney(0));const latest=eaTradesPortal[0];if(latest){set("eaLastEvent",latest.event||"—");set("eaLastSide",latest.type||latest.side||"—");set("eaSymbol",latest.symbol||"XAUUSD");set("eaLastEventBadge",String(latest.event||"EVENT").toUpperCase());set("eaPortalUpdated",latest.time||"—");const dot=document.getElementById("eaPortalStatusDot");if(dot)dot.className="eaDot online";set("eaPortalStatus","ONLINE");}const today=new Date().toLocaleDateString("en-CA",{timeZone:"Asia/Jakarta"});set("eaTodayTrades",closes.filter(x=>String(x.time||"").slice(0,10)===today).length);const body=document.getElementById("eaTradeBody");if(body)body.innerHTML=eaTradesPortal.slice(0,50).map(x=>`<tr><td>${eaSafe(x.time)}</td><td>${eaSafe(x.event)}</td><td>${eaSafe(x.symbol||"—")}</td><td>${eaSafe(x.type||"—")}</td><td>${x.price==null?"—":eaMoney(x.price)}</td><td>${x.sl==null?"—":eaMoney(x.sl)}</td><td>${x.tp==null?"—":eaMoney(x.tp)}</td><td>${String(x.event).toLowerCase()==="close"?eaSigned(Number(x.profit||0)+Number(x.swap||0)+Number(x.commission||0)):"—"}</td></tr>`).join("")||`<tr><td colspan="8" class="muted">Belum ada data EA.</td></tr>`;const daily={};closes.forEach(x=>{let d=String(x.time||"").slice(0,10);daily[d]=(daily[d]||0)+Number(x.profit||0)+Number(x.swap||0)+Number(x.commission||0)});const ds=Object.keys(daily).sort().slice(-35);const dg=document.getElementById("eaDailyGrid");if(dg)dg.innerHTML=ds.map(d=>`<div class="eaDay ${daily[d]>0?"eaPlus":daily[d]<0?"eaMinus":"eaFlat"}"><small>${eaSafe(d)}</small><b>${eaSigned(daily[d])}</b></div>`).join("")||`<span class="muted">Belum ada hasil harian.</span>`;}
+setInterval(loadEATradesPortal,15000);
+if(sb) loadEATradesPortal();
