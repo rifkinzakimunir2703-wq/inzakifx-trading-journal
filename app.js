@@ -26,7 +26,10 @@
     return null;
   }
   let sb=null, user=null, ownerId=null, trades=[], accounts=[], payouts=[], eaTrades=[], eaSnapshots=[];
-  let monthCursor=new Date(); let editingAccount=null; let eaTimer=null;
+  let monthCursor=new Date(); let editingAccount=null; let eaTimer=null; let eaMonthCursor=new Date(); let gEaMonthCursor=new Date();
+  const EA_CONSISTENCY_TARGET=30; // % — hari terbaik tidak boleh melebihi X% dari total profit
+  const EA_R_TARGET=6; // target +6R
+  const EA_R_UNIT_PCT=1; // 1R diasumsikan = 1% dari balance akun
 
   function show(id,on=true){ const el=$(id); if(el) el.classList.toggle('hidden',!on); }
   function msg(id,text){ if($(id)) $(id).textContent=text||''; }
@@ -51,7 +54,7 @@
     updateHeader();
     if(user){
       ownerId=user.id;
-      setStatus('Admin mode aktif — data yang ditampilkan hanya milik akun login.');
+      setStatus('');
       await loadAll(true);
       openPage('global');
     }else{
@@ -106,7 +109,7 @@
     if(id==='payouts')renderPayouts();
     if(id==='calendar')renderCalendar();
     if(id==='journal')renderJournal();
-    if(id==='ea')loadEA();
+    if(id==='ea'||id==='global')loadEA();
     window.scrollTo({top:0,behavior:'smooth'});
   }
 
@@ -166,7 +169,7 @@
     } else eaSnapshots=snapRes.data||[];
     renderEA();
     if(eaTimer)clearTimeout(eaTimer);
-    eaTimer=setTimeout(()=>{if(!$('ea').classList.contains('hidden'))loadEA()},15000)
+    eaTimer=setTimeout(()=>{if(!$('ea').classList.contains('hidden')||!$('global').classList.contains('hidden'))loadEA()},15000)
   }
 
   function latestSnapshot(account){
@@ -193,6 +196,28 @@
 
   function isClosedEA(x){const e=String(x.event||'').toLowerCase();return e.includes('close')||e.includes('result')||e.includes('closed');}
 
+  function eaDayKey(t){return t?new Date(t).toISOString().slice(0,10):null;}
+  function eaDailyPL(rows){
+    const map=new Map();
+    rows.forEach(x=>{const k=eaDayKey(x.time);if(!k)return;map.set(k,(map.get(k)||0)+Number(x.profit||0))});
+    return map;
+  }
+  function eaConsistency(rows){
+    const daily=eaDailyPL(rows);
+    const vals=[...daily.values()];
+    const total=vals.reduce((a,v)=>a+v,0);
+    const bestDay=vals.length?Math.max(...vals):0;
+    const ratio=(total>0 && bestDay>0)?(bestDay/total*100):0;
+    const pass=total<=0?true:ratio<=EA_CONSISTENCY_TARGET;
+    return {ratio,bestDay,total,pass};
+  }
+  function eaRProgress(balance,netPL){
+    const unit=Number(balance||0)*(EA_R_UNIT_PCT/100);
+    const r=unit>0?netPL/unit:0;
+    const pct=Math.max(0,Math.min(100,r/EA_R_TARGET*100));
+    return {r,pct};
+  }
+
   function renderEAAccounts(){
     const list=eaAccountsData();
     const filter=$('eaAccountFilter')?.value||'';
@@ -201,8 +226,13 @@
       $('eaAccountFilter').innerHTML='<option value="">Semua akun</option>'+list.map(a=>`<option value="${esc(a.account)}">${esc(a.account)}${a.broker&&a.broker!=='—'?' · '+esc(a.broker):''}</option>`).join('');
       $('eaAccountFilter').value=list.some(a=>a.account===old)?old:'';
     }
-    if(!list.length){$('eaAccounts').innerHTML='<div class="emptyState">Belum ada akun EA. Setelah EA mengirim trade, akun MT5 akan muncul otomatis di sini.</div>';return}
-    $('eaAccounts').innerHTML=list.map(a=>{
+    if($('gEaAccountFilter')){
+      const gold=$('gEaAccountFilter').value;
+      $('gEaAccountFilter').innerHTML='<option value="">Semua akun</option>'+list.map(a=>`<option value="${esc(a.account)}">${esc(a.account)}${a.broker&&a.broker!=='—'?' · '+esc(a.broker):''}</option>`).join('');
+      $('gEaAccountFilter').value=list.some(a=>a.account===gold)?gold:'';
+    }
+    if(!list.length){$('eaAccounts').innerHTML='<div class="emptyState"><svg width="46" height="46" viewBox="0 0 32 32" fill="none" aria-hidden="true"><circle cx="16" cy="16" r="14" stroke="currentColor" stroke-width="1.6" opacity=".35"/><path d="M9 19 L13 13 L17 16 L23 9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><div>Belum ada akun EA. Setelah EA mengirim trade, akun MT5 akan muncul otomatis di sini.</div></div>';return}
+    $('eaAccounts').innerHTML=list.map((a,idx)=>{
       const closed=a.rows.filter(isClosedEA); const st=stats(closed.map(x=>({pl:Number(x.profit||0)})));
       const snap=latestSnapshot(a.account);
       const snapTime=snap?.time?new Date(snap.time).getTime():0;
@@ -212,13 +242,71 @@
       const lastTrade=a.rows[0];
       const balance=snap?Number(snap.balance||0):0, equity=snap?Number(snap.equity||0):0;
       const ddPct=(balance>0&&equity<balance)?((balance-equity)/balance*100):0;
-      return `<article class="eaAccountCard ${online?'eaOnline':'eaOffline'}" data-ea-account-card="${esc(a.account)}">
+      const cons=eaConsistency(closed);
+      const rt=eaRProgress(balance||equity,pnl);
+      const daily=eaDailyPL(closed); const dvals=[...daily.values()];
+      const bestDay=dvals.length?Math.max(...dvals):0, worstDay=dvals.length?Math.min(...dvals):0;
+      return `<article class="eaAccountCard ${online?'eaOnline':'eaOffline'}" data-ea-account-card="${esc(a.account)}" style="animation-delay:${Math.min(idx,8)*.05}s">
         <div class="eaAccountTop"><div><div class="eaAccountName">${esc(a.account)}</div><small>${esc(snap?.broker||a.broker)} · ${esc(snap?.symbol||a.symbol)}</small></div><span class="eaStatus ${online?'online':'offline'}"><i></i>${online?'ONLINE':'OFFLINE'}</span></div>
-        <div class="eaMiniGrid"><div><small>Balance</small><b>${money(balance)}</b></div><div><small>Equity</small><b>${money(equity)}</b></div><div><small>Today P/L</small><b class="${Number(snap?.today_pl||0)>=0?'positive':'negative'}">${money(snap?.today_pl||0)}</b></div><div><small>Floating</small><b class="${Number(snap?.floating_profit||0)>=0?'positive':'negative'}">${money(snap?.floating_profit||0)}</b></div><div><small>Trades</small><b>${closed.length}</b></div><div><small>Win Rate</small><b>${st.wr.toFixed(1)}%</b></div><div><small>PF</small><b>${st.pf.toFixed(2)}</b></div><div><small>DD Est.</small><b>${ddPct.toFixed(1)}%</b></div></div>
+        <div class="eaMiniGrid"><div><small>Balance</small><b>${money(balance)}</b></div><div><small>Equity</small><b>${money(equity)}</b></div><div><small>Today P/L</small><b class="${Number(snap?.today_pl||0)>=0?'positive':'negative'}">${money(snap?.today_pl||0)}</b></div><div><small>Floating</small><b class="${Number(snap?.floating_profit||0)>=0?'positive':'negative'}">${money(snap?.floating_profit||0)}</b></div><div><small>Trades</small><b>${closed.length}</b></div><div><small>Win Rate</small><b>${st.wr.toFixed(1)}%</b></div><div><small>PF</small><b>${st.pf.toFixed(2)}</b></div><div><small>DD Est.</small><b>${ddPct.toFixed(1)}%</b></div><div><small>Avg Win</small><b class="positive">${money(st.avgW)}</b></div><div><small>Avg Loss</small><b class="negative">${money(-st.avgL)}</b></div><div><small>Expectancy</small><b class="${st.exp>=0?'positive':'negative'}">${money(st.exp)}</b></div><div><small>Max DD $</small><b class="negative">${money(-st.dd)}</b></div><div><small>Best Day</small><b class="positive">${money(bestDay)}</b></div><div><small>Worst Day</small><b class="negative">${money(worstDay)}</b></div><div><small>Net P/L</small><b class="${pnl>=0?'positive':'negative'}">${money(pnl)}</b></div><div><small>W/L</small><b>${st.w}/${st.l}</b></div></div>
         <div class="eaMLLine"><span>ML ${(Number(snap?.ml_probability||0)*100).toFixed(1)}%</span><span>Risk ×${Number(snap?.adaptive_risk||1).toFixed(2)}</span><span>Samples ${Number(snap?.ml_samples||0)}</span><span>WF ${snap?.wf_enabled?'ON':'OFF'} ${Number(snap?.wf_valid_folds||0)}/${Number(snap?.wf_folds||0)}</span></div>
+        <div class="eaRuleRow">
+          <div class="eaRuleBox"><div class="eaRuleHead"><span>🎯 Target +${EA_R_TARGET}R</span><b>${rt.r.toFixed(2)}R</b></div><div class="progress thin"><i style="width:${rt.pct}%"></i></div></div>
+          <div class="eaRuleBox"><div class="eaRuleHead"><span>📏 Consistency Rule</span><span class="ruleBadge ${cons.pass?'pass':'fail'}">${cons.pass?'PASS':'CEK'} · ${cons.ratio.toFixed(0)}%/${EA_CONSISTENCY_TARGET}%</span></div><small class="muted">Hari terbaik ${money(cons.bestDay)} dari total ${money(cons.total)}</small></div>
+        </div>
         <div class="eaAccountFoot"><span>Last: ${lastTrade?.event?esc(lastTrade.event):esc(snap?.event||'—')}</span><span>${activity?new Date(activity).toLocaleString('id-ID'):'—'}</span></div>
       </article>`
     }).join('')
+    renderEAGlobalStats(list);
+  }
+
+  function renderEAGlobalStats(list){
+    if(!$('egAccounts'))return;
+    let online=0,bal=0,eq=0,floating=0;
+    let allClosed=[];
+    list.forEach(a=>{
+      const closed=a.rows.filter(isClosedEA); allClosed=allClosed.concat(closed);
+      const snap=latestSnapshot(a.account);
+      const snapTime=snap?.time?new Date(snap.time).getTime():0;
+      const activity=Math.max(a.last||0,snapTime);
+      if(activity>0 && Date.now()-activity<=3*60*1000)online++;
+      bal+=snap?Number(snap.balance||0):0; eq+=snap?Number(snap.equity||0):0;
+      floating+=snap?Number(snap.floating_profit||0):0;
+    });
+    const s=stats(allClosed.map(x=>({pl:Number(x.profit||0)})));
+    const daily=eaDailyPL(allClosed); const dvals=[...daily.values()];
+    const bestDay=dvals.length?Math.max(...dvals):0, worstDay=dvals.length?Math.min(...dvals):0;
+    const cons=eaConsistency(allClosed);
+    setText('egAccounts',list.length);setText('egOnline',online);setText('egBalance',money(bal));setText('egEquity',money(eq));setText('egFloating',money(floating));setText('egPL',money(s.net));
+    setText('egTrades',s.n);setText('egWR',s.wr.toFixed(1)+'%');setText('egPF',s.pf.toFixed(2));setText('egAvgW',money(s.avgW));setText('egAvgL',money(-s.avgL));setText('egExp',money(s.exp));
+    setText('egDD',money(-s.dd));setText('egBest',money(bestDay));setText('egWorst',money(worstDay));setText('egCons',cons.ratio.toFixed(0)+'%');
+    valueClass('egPL',s.net);valueClass('egFloating',floating);valueClass('egExp',s.exp);
+  }
+
+  function buildEACalendarGrid(gridId,titleId,cursor,rows){
+    if(!$(gridId))return;
+    const y=cursor.getFullYear(),m=cursor.getMonth(),first=new Date(y,m,1).getDay(),days=new Date(y,m+1,0).getDate();
+    if($(titleId))$(titleId).textContent=new Date(y,m,1).toLocaleDateString('id-ID',{month:'long',year:'numeric'});
+    let h=['Min','Sen','Sel','Rab','Kam','Jum','Sab'].map(x=>`<div class="calHead">${x}</div>`).join('');
+    for(let i=0;i<first;i++)h+='<div></div>';
+    for(let d=1;d<=days;d++){
+      const key=`${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      const pl=rows.filter(x=>eaDayKey(x.time)===key).reduce((s,x)=>s+Number(x.profit||0),0);
+      h+=`<div class="calDay ${pl>0?'calWin':pl<0?'calLoss':''} ${key===new Date().toISOString().slice(0,10)?'calToday':''}"><b>${d}</b><small>${pl?money(pl):'—'}</small></div>`;
+    }
+    $(gridId).innerHTML=h;
+  }
+
+  function renderEACalendar(){
+    const filter=$('eaAccountFilter')?.value||'';
+    const rows=(filter?eaTrades.filter(x=>eaAccountKey(x)===filter):eaTrades).filter(isClosedEA);
+    buildEACalendarGrid('eaCalendarGrid','eaMonthTitle',eaMonthCursor,rows);
+  }
+
+  function renderGlobalEACalendar(){
+    const filter=$('gEaAccountFilter')?.value||'';
+    const rows=(filter?eaTrades.filter(x=>eaAccountKey(x)===filter):eaTrades).filter(isClosedEA);
+    buildEACalendarGrid('gEaCalendarGrid','gEaMonthTitle',gEaMonthCursor,rows);
   }
 
   function renderEA(){
@@ -228,6 +316,8 @@
     if(latest){setText('eaLast',latest.event||'—');setText('eaSide',latest.type||'—');setText('eaSymbol',latest.symbol||'—');setText('eaTime',new Date(latest.time).toLocaleString('id-ID'));setText('eaBadge',latest.event||'LIVE');document.querySelector('.live')?.classList.add('online');setText('liveText','ONLINE')}
     else {document.querySelector('.live')?.classList.remove('online');setText('liveText','WAITING');}
     renderEAAccounts();
+    renderEACalendar();
+    renderGlobalEACalendar();
     const filter=$('eaAccountFilter')?.value||''; const rows=filter?eaTrades.filter(x=>eaAccountKey(x)===filter):eaTrades;
     setText('eaFilterLabel',filter?`AKUN ${filter}`:'SEMUA AKUN');
     $('eaBody').innerHTML=rows.map(x=>`<tr><td>${x.time?esc(new Date(x.time).toLocaleString('id-ID')):'—'}</td><td><b>${esc(eaAccountKey(x))}</b></td><td>${esc(x.broker||'—')}</td><td>${esc(x.event||'—')}</td><td>${esc(x.symbol||'—')}</td><td>${esc(x.type||'—')}</td><td>${x.price??'—'}</td><td class="${Number(x.profit)>=0?'positive':'negative'}">${money(x.profit)}</td></tr>`).join('')||'<tr><td colspan="8" class="muted center">Belum ada data EA untuk akun ini.</td></tr>'
@@ -241,7 +331,9 @@
     document.querySelectorAll('[data-close]').forEach(b=>b.addEventListener('click',()=>show(b.dataset.close,false)));
     document.querySelectorAll('.navBtn').forEach(b=>b.addEventListener('click',()=>openPage(b.dataset.page)));
     ['fAccount','fStrategy','fTF','fSession','fFrom','fTo'].forEach(id=>$(id)?.addEventListener('change',renderPerformance));$('fReset')?.addEventListener('click',()=>{['fAccount','fStrategy','fTF','fSession','fFrom','fTo'].forEach(id=>{if($(id))$(id).value=''});renderPerformance()});
-    $('search')?.addEventListener('input',renderJournal);$('eaAccountFilter')?.addEventListener('change',renderEA);$('export')?.addEventListener('click',exportCSV);['quickTrade','journalAdd'].forEach(id=>$(id)?.addEventListener('click',()=>{fillAccountSelects();show('tradeModal',true)}));
+    $('search')?.addEventListener('input',renderJournal);$('eaAccountFilter')?.addEventListener('change',renderEA);$('export')?.addEventListener('click',exportCSV);
+    $('eaPrevMonth')?.addEventListener('click',()=>{eaMonthCursor.setMonth(eaMonthCursor.getMonth()-1);renderEACalendar()});$('eaNextMonth')?.addEventListener('click',()=>{eaMonthCursor.setMonth(eaMonthCursor.getMonth()+1);renderEACalendar()});$('eaTodayMonth')?.addEventListener('click',()=>{eaMonthCursor=new Date();renderEACalendar()});
+    $('gEaAccountFilter')?.addEventListener('change',renderGlobalEACalendar);$('gEaPrevMonth')?.addEventListener('click',()=>{gEaMonthCursor.setMonth(gEaMonthCursor.getMonth()-1);renderGlobalEACalendar()});$('gEaNextMonth')?.addEventListener('click',()=>{gEaMonthCursor.setMonth(gEaMonthCursor.getMonth()+1);renderGlobalEACalendar()});$('gEaTodayMonth')?.addEventListener('click',()=>{gEaMonthCursor=new Date();renderGlobalEACalendar()});['quickTrade','journalAdd'].forEach(id=>$(id)?.addEventListener('click',()=>{fillAccountSelects();show('tradeModal',true)}));
     $('tradeForm')?.addEventListener('submit',saveTrade);$('addAccount')?.addEventListener('click',()=>{editingAccount=null;$('accountForm').reset();show('accountModal',true)});$('accountForm')?.addEventListener('submit',saveAccount);$('addPayout')?.addEventListener('click',()=>{fillAccountSelects();show('payoutModal',true)});$('payoutForm')?.addEventListener('submit',savePayout);
     $('prevMonth')?.addEventListener('click',()=>{monthCursor.setMonth(monthCursor.getMonth()-1);renderCalendar()});$('nextMonth')?.addEventListener('click',()=>{monthCursor.setMonth(monthCursor.getMonth()+1);renderCalendar()});$('todayMonth')?.addEventListener('click',()=>{monthCursor=new Date();renderCalendar()});
     document.addEventListener('click',e=>{const d=e.target.closest('[data-delete-trade]');if(d)deleteTrade(d.dataset.deleteTrade);const ed=e.target.closest('[data-edit-account]');if(ed)editAccount(ed.dataset.editAccount);const st=e.target.closest('[data-status-account]');if(st)changeStatus(st.dataset.statusAccount);const del=e.target.closest('[data-delete-account]');if(del)removeAccount(del.dataset.deleteAccount);const day=e.target.closest('[data-date]');if(day){const date=day.dataset.date;$('fFrom').value=date;$('fTo').value=date;openPage('performance')}});
