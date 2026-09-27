@@ -119,3 +119,32 @@ button,input,select,textarea{font:inherit}button,a{touch-action:manipulation}.hi
 .eaMLLine{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px;padding-top:9px;border-top:1px solid var(--border);font-size:12px;color:var(--muted)}
 .eaMLLine span{padding:5px 8px;border:1px solid var(--border);border-radius:999px;background:rgba(255,255,255,.02)}
 @media(max-width:700px){.eaMLLine{gap:5px}.eaMLLine span{font-size:11px;padding:4px 7px}}
+
+/* ===== V8: Riwayat trade per akun (collapsible) ===== */
+.eaHistory{margin-top:12px;padding-top:10px;border-top:1px solid #202a35}
+.eaHistory summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:7px;font-size:12px;font-weight:800;color:#aeb9c6;user-select:none;padding:4px 0;transition:color .15s ease}
+.eaHistory summary::-webkit-details-marker{display:none}
+.eaHistory summary::before{content:'▸';display:inline-block;color:var(--green);transition:transform .22s ease}
+.eaHistory[open] summary::before{transform:rotate(90deg)}
+.eaHistory summary:hover{color:var(--text)}
+.eaHistoryScroll{max-height:230px;overflow:auto;margin-top:9px;border:1px solid #1a232d;border-radius:10px;animation:fadeIn .25s ease}
+.eaHistoryScroll table{min-width:100%}
+.eaHistoryScroll th,.eaHistoryScroll td{padding:7px 8px;font-size:11px;white-space:nowrap}
+.eaHistoryScroll th{position:sticky;top:0;background:#0e151d}
+
+/* ===== V8: Halaman Sertifikat Payout ===== */
+.heroCert::before{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 170' fill='none'%3E%3Crect x='28' y='8' width='118' height='88' rx='8' fill='none' stroke='%23f0c862' stroke-width='3'/%3E%3Cline x1='44' y1='32' x2='130' y2='32' stroke='%23f0c862' stroke-width='3' stroke-linecap='round'/%3E%3Cline x1='44' y1='48' x2='130' y2='48' stroke='%23f0c862' stroke-width='3' stroke-linecap='round' opacity='.7'/%3E%3Cline x1='44' y1='64' x2='96' y2='64' stroke='%23f0c862' stroke-width='3' stroke-linecap='round' opacity='.5'/%3E%3Ccircle cx='150' cy='112' r='27' fill='%230f1620' stroke='%23f0c862' stroke-width='3'/%3E%3Cpath d='M150 98 l5 10 11 1 -8 8 2 11 -10 -5 -10 5 2 -11 -8 -8 11 -1 z' fill='%23f0c862'/%3E%3Cpath d='M137 132 L127 162 L150 149 L173 162 L163 132' fill='none' stroke='%23f0c862' stroke-width='3' stroke-linejoin='round'/%3E%3C/svg%3E");opacity:.9}
+.certGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px}
+.certCard{background:var(--panel);border:1px solid var(--line);border-radius:15px;overflow:hidden;animation:popIn .35s ease both;transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease}
+.certCard:hover{transform:translateY(-4px);border-color:#3a4655;box-shadow:0 12px 26px rgba(0,0,0,.35)}
+.certThumb{position:relative;aspect-ratio:4/3;background:linear-gradient(145deg,#0d141c,#0a1017);display:flex;align-items:center;justify-content:center;overflow:hidden}
+.certThumb img{width:100%;height:100%;object-fit:cover;transition:transform .35s ease}
+.certCard:hover .certThumb img{transform:scale(1.07)}
+.certBadge{position:absolute;top:8px;left:8px;background:rgba(53,208,127,.14);border:1px solid #236f4b;color:#55d98e;font-size:10px;font-weight:800;padding:4px 8px;border-radius:999px;backdrop-filter:blur(4px)}
+.certBody{padding:12px 14px 14px}
+.certTop{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:5px}
+.certBody small{display:block;color:var(--muted);font-size:11px;margin-top:2px}
+.certActions{display:flex;gap:7px;margin-top:11px}
+.certActions a,.certActions button{flex:1;text-align:center;font-size:12px;text-decoration:none;min-height:36px;display:inline-flex;align-items:center;justify-content:center}
+@media(max-width:560px){.certGrid{grid-template-columns:repeat(2,1fr)}.certThumb{aspect-ratio:1/1}}
+@media(max-width:360px){.certGrid{grid-template-columns:1fr}}

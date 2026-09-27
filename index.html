@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#080b10"><title>INZAKI TRADE — Workspace</title>
-<link rel="stylesheet" href="style.css?v=INZAKI_V7_20260928">
+<link rel="stylesheet" href="style.css?v=INZAKI_V8_20260928">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="config.js?v=INZAKI_V7_20260928"></script>
+<script src="config.js?v=INZAKI_V8_20260928"></script>
 </head>
 <body>
 <header class="header">
@@ -20,46 +20,17 @@
 <main class="wrap">
   <div id="statusBar" class="statusBar hidden"></div>
   <nav id="nav" class="nav" aria-label="Navigation">
-    <button class="navBtn active" data-page="global">🌐 <span>Dashboard</span></button>
+    <button class="navBtn active" data-page="ea">🤖 <span>Dashboard</span></button>
+    <button class="navBtn" data-page="global">🌐 <span>Ringkasan</span></button>
     <button class="navBtn" data-page="performance">📊 <span>Performance</span></button>
     <button class="navBtn" data-page="accounts">🏦 <span>Accounts</span></button>
     <button class="navBtn" data-page="payouts">💰 <span>Payouts</span></button>
+    <button class="navBtn" data-page="certificates">🏆 <span>Sertifikat</span></button>
     <button class="navBtn" data-page="calendar">📅 <span>Calendar</span></button>
     <button class="navBtn" data-page="journal">📒 <span>Journal</span></button>
-    <button class="navBtn" data-page="ea">🤖 <span>EA Monitor</span></button>
   </nav>
 
-  <section id="global" class="page">
-    <div class="hero"><div><div class="eyebrow">WORKSPACE OVERVIEW</div><h1>Global Dashboard</h1><p>Ringkasan performa trading, prop firm, payout, dan kondisi akun.</p></div><button class="adminOnly primary" id="quickTrade" type="button">＋ Tambah Trade</button></div>
-    <div class="cards four">
-      <div class="card"><small>Total Trading P/L</small><strong id="gPL">$0.00</strong></div><div class="card"><small>Win Rate</small><strong id="gWR">0%</strong></div><div class="card"><small>Total Trade</small><strong id="gTrades">0</strong></div><div class="card"><small>Profit Factor</small><strong id="gPF">0.00</strong></div>
-    </div>
-    <div class="cards four">
-      <div class="card"><small>Total Biaya Akun</small><strong id="gFees">$0.00</strong></div><div class="card"><small>Total Payout</small><strong id="gPayout">$0.00</strong></div><div class="card"><small>Net Cash Result</small><strong id="gNet">$0.00</strong></div><div class="card"><small>Active Accounts</small><strong id="gAccounts">0</strong></div>
-    </div>
-    <section class="panel"><div class="sectionHead"><div><h2>📈 Equity Curve</h2><small>Trading P/L kumulatif</small></div><b id="equityLabel">$0.00</b></div><canvas id="equity"></canvas></section>
-    <section class="panel"><div class="sectionHead"><div><h2>🏦 Account Overview</h2><small>Status akun prop firm</small></div></div><div id="accountOverview" class="accountList"></div></section>
-    <section class="panel"><div class="sectionHead"><div><h2>🤖 Calendar P/L — Semua Akun EA</h2><small>Profit/loss harian EA, pilih akun untuk filter</small></div><select id="gEaAccountFilter" class="eaFilter"><option value="">Semua akun</option></select></div>
-      <div class="calendarTools"><button id="gEaPrevMonth" class="secondary" type="button">‹</button><b id="gEaMonthTitle">—</b><button id="gEaNextMonth" class="secondary" type="button">›</button><button id="gEaTodayMonth" class="secondary" type="button">Hari ini</button></div>
-      <div id="gEaCalendarGrid" class="calendar"></div>
-    </section>
-  </section>
-
-  <section id="performance" class="page hidden">
-    <div class="hero"><div><div class="eyebrow">ANALYTICS</div><h1>Journal Performance</h1><p>Analisis berdasarkan akun, strategi, timeframe, dan session.</p></div></div>
-    <section class="panel filters"><select id="fAccount"><option value="">Semua akun</option></select><select id="fStrategy"><option value="">Semua strategi</option></select><select id="fTF"><option value="">Semua timeframe</option></select><select id="fSession"><option value="">Semua session</option></select><input id="fFrom" type="date"><input id="fTo" type="date"><button id="fReset" class="secondary" type="button">Reset</button></section>
-    <div class="cards four"><div class="card"><small>Total Trade</small><strong id="pTrades">0</strong></div><div class="card"><small>Win Rate</small><strong id="pWR">0%</strong></div><div class="card"><small>Net P/L</small><strong id="pPL">$0.00</strong></div><div class="card"><small>Profit Factor</small><strong id="pPF">0.00</strong></div></div>
-    <div class="cards four"><div class="card"><small>Average Win</small><strong id="pAvgW">$0.00</strong></div><div class="card"><small>Average Loss</small><strong id="pAvgL">$0.00</strong></div><div class="card"><small>Expectancy</small><strong id="pExp">$0.00</strong></div><div class="card"><small>Max Drawdown</small><strong id="pDD">$0.00</strong></div></div>
-    <section class="panel"><div class="sectionHead"><h2>📈 Equity</h2><b id="pEq">$0.00</b></div><canvas id="perfChart"></canvas></section>
-    <div class="two"><section class="panel"><div class="sectionHead"><h2>🏦 Per Account</h2></div><div id="byAccount"></div></section><section class="panel"><div class="sectionHead"><h2>🧠 Per Strategy</h2></div><div id="byStrategy"></div></section></div>
-    <div class="two"><section class="panel"><div class="sectionHead"><h2>⏱️ Per Timeframe</h2></div><div id="byTF"></div></section><section class="panel"><div class="sectionHead"><h2>🌍 Per Session</h2></div><div id="bySession"></div></section></div>
-  </section>
-
-  <section id="accounts" class="page hidden"><div class="hero"><div><div class="eyebrow">PROP FIRM</div><h1>Accounts</h1><p>Kelola akun, target, drawdown, dan consistency.</p></div><button id="addAccount" class="primary adminOnly" type="button">＋ Tambah Akun</button></div><div id="accountsList" class="accountGrid"></div></section>
-  <section id="payouts" class="page hidden"><div class="hero"><div><div class="eyebrow">CASH FLOW</div><h1>Payouts</h1><p>Riwayat payout dari akun prop firm.</p></div><button id="addPayout" class="primary adminOnly" type="button">＋ Tambah Payout</button></div><section class="panel"><div id="payoutList"></div></section></section>
-  <section id="calendar" class="page hidden"><div class="hero"><div><div class="eyebrow">TRADING DAYS</div><h1>Calendar</h1><p>Profit/loss per hari.</p></div></div><div class="calendarTools"><button id="prevMonth" class="secondary" type="button">‹</button><b id="monthTitle">—</b><button id="nextMonth" class="secondary" type="button">›</button><button id="todayMonth" class="secondary" type="button">Hari ini</button></div><section class="panel"><div id="calendarGrid" class="calendar"></div></section></section>
-  <section id="journal" class="page hidden"><div class="hero"><div><div class="eyebrow">TRADE LOG</div><h1>Trading Journal</h1><p>Jurnal trade yang tersimpan di Supabase.</p></div><div class="heroBtns"><button id="journalAdd" class="primary adminOnly" type="button">＋ Trade</button><button id="export" class="secondary" type="button">Export CSV</button></div></div><div class="cards four"><div class="card"><small>Total Trade</small><strong id="jTrades">0</strong></div><div class="card"><small>Win Rate</small><strong id="jWR">0%</strong></div><div class="card"><small>Net P/L</small><strong id="jPL">$0.00</strong></div><div class="card"><small>Max DD</small><strong id="jDD">$0.00</strong></div></div><section class="panel"><input id="search" placeholder="Cari symbol, strategi, session..."><div id="journalList" class="tradeList"></div></section></section>
-  <section id="ea" class="page hidden"><div class="hero eaHero"><div><div class="eyebrow">AUTOMATION</div><h1>EA Monitor</h1><p>Monitor trade EA dari MT5 — trade + heartbeat + snapshot akun real-time.</p></div><div class="live"><i id="liveDot"></i><b id="liveText">WAITING</b></div></div><div class="cards four"><div class="card"><small>EA Trades</small><strong id="eaTrades">0</strong></div><div class="card"><small>Win Rate</small><strong id="eaWR">0%</strong></div><div class="card"><small>Net P/L</small><strong id="eaPL">$0.00</strong></div><div class="card"><small>Profit Factor</small><strong id="eaPF">0.00</strong></div></div>
+  <section id="ea" class="page"><div class="hero eaHero"><div><div class="eyebrow">DASHBOARD UTAMA · AUTOMATION</div><h1>EA Monitor</h1><p>Monitor trade EA dari MT5 secara real-time — trade, heartbeat, snapshot akun, riwayat trade dan P/L per akun maupun gabungan semua akun.</p></div><div class="live"><i id="liveDot"></i><b id="liveText">WAITING</b></div></div><div class="cards four"><div class="card"><small>EA Trades</small><strong id="eaTrades">0</strong></div><div class="card"><small>Win Rate</small><strong id="eaWR">0%</strong></div><div class="card"><small>Net P/L</small><strong id="eaPL">$0.00</strong></div><div class="card"><small>Profit Factor</small><strong id="eaPF">0.00</strong></div></div>
     <section class="panel"><div class="sectionHead"><h2>⚡ Status Terkini</h2><span id="eaBadge" class="badge">WAITING</span></div><div class="metricRows four"><div><span>Last Event</span><b id="eaLast">—</b></div><div><span>Side</span><b id="eaSide">—</b></div><div><span>Symbol</span><b id="eaSymbol">—</b></div><div><span>Last Update</span><b id="eaTime">—</b></div></div></section>
 
     <section class="panel eaGlobalPanel"><div class="sectionHead"><div><h2>🌐 Global Statistik — Semua Akun EA</h2><small>Gabungan seluruh akun MT5 yang terdeteksi</small></div></div>
@@ -91,7 +62,7 @@
     </section>
 
     <section class="panel eaAccountsPanel">
-      <div class="sectionHead"><div><h2>🖥️ EA Accounts</h2><small>Target +6R · Consistency Rule · Akun MT5 terdeteksi otomatis</small></div><select id="eaAccountFilter" class="eaFilter"><option value="">Semua akun</option></select></div>
+      <div class="sectionHead"><div><h2>🖥️ EA Accounts</h2><small>Target +6R · Consistency Rule 15% · Riwayat trade & P/L per akun · Akun MT5 terdeteksi otomatis</small></div><select id="eaAccountFilter" class="eaFilter"><option value="">Semua akun</option></select></div>
       <div id="eaAccounts" class="eaAccountGrid"><div class="emptyState"><svg width="46" height="46" viewBox="0 0 32 32" fill="none" aria-hidden="true"><circle cx="16" cy="16" r="14" stroke="currentColor" stroke-width="1.6" opacity=".35"/><path d="M9 19 L13 13 L17 16 L23 9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><div>Belum ada akun EA. Pasang EA di MT5 dan kirim transaksi ke Supabase.</div></div></div>
     </section>
 
@@ -100,13 +71,60 @@
       <div id="eaCalendarGrid" class="calendar"></div>
     </section>
 
-    <section class="panel"><div class="sectionHead"><div><h2>📒 EA Trade Stream</h2><small>Auto refresh 15 detik</small></div><span id="eaFilterLabel" class="badge">SEMUA AKUN</span></div><div class="tableScroll"><table><thead><tr><th>Time</th><th>Account</th><th>Broker</th><th>Event</th><th>Symbol</th><th>Side</th><th>Price</th><th>P/L</th></tr></thead><tbody id="eaBody"><tr><td colspan="8" class="muted center">Belum ada data EA.</td></tr></tbody></table></div></section></section>
+    <section class="panel"><div class="sectionHead"><div><h2>📒 Riwayat Trade EA — Semua Akun</h2><small>Gabungan seluruh akun · auto refresh 15 detik</small></div><span id="eaFilterLabel" class="badge">SEMUA AKUN</span></div><div class="tableScroll"><table><thead><tr><th>Time</th><th>Account</th><th>Broker</th><th>Event</th><th>Symbol</th><th>Side</th><th>Price</th><th>P/L</th></tr></thead><tbody id="eaBody"><tr><td colspan="8" class="muted center">Belum ada data EA.</td></tr></tbody></table></div></section></section>
+
+  <section id="global" class="page hidden">
+    <div class="hero"><div><div class="eyebrow">WORKSPACE OVERVIEW</div><h1>Ringkasan Workspace</h1><p>Ringkasan performa trading, prop firm, payout, dan kondisi akun.</p></div><button class="adminOnly primary" id="quickTrade" type="button">＋ Tambah Trade</button></div>
+    <div class="cards four">
+      <div class="card"><small>Total Trading P/L</small><strong id="gPL">$0.00</strong></div><div class="card"><small>Win Rate</small><strong id="gWR">0%</strong></div><div class="card"><small>Total Trade</small><strong id="gTrades">0</strong></div><div class="card"><small>Profit Factor</small><strong id="gPF">0.00</strong></div>
+    </div>
+    <div class="cards four">
+      <div class="card"><small>Total Biaya Akun</small><strong id="gFees">$0.00</strong></div><div class="card"><small>Total Payout</small><strong id="gPayout">$0.00</strong></div><div class="card"><small>Net Cash Result</small><strong id="gNet">$0.00</strong></div><div class="card"><small>Active Accounts</small><strong id="gAccounts">0</strong></div>
+    </div>
+    <section class="panel"><div class="sectionHead"><div><h2>📈 Equity Curve</h2><small>Trading P/L kumulatif</small></div><b id="equityLabel">$0.00</b></div><canvas id="equity"></canvas></section>
+    <section class="panel"><div class="sectionHead"><div><h2>🏦 Account Overview</h2><small>Status akun prop firm</small></div></div><div id="accountOverview" class="accountList"></div></section>
+    <section class="panel"><div class="sectionHead"><div><h2>🤖 Calendar P/L — Semua Akun EA</h2><small>Profit/loss harian EA, pilih akun untuk filter</small></div><select id="gEaAccountFilter" class="eaFilter"><option value="">Semua akun</option></select></div>
+      <div class="calendarTools"><button id="gEaPrevMonth" class="secondary" type="button">‹</button><b id="gEaMonthTitle">—</b><button id="gEaNextMonth" class="secondary" type="button">›</button><button id="gEaTodayMonth" class="secondary" type="button">Hari ini</button></div>
+      <div id="gEaCalendarGrid" class="calendar"></div>
+    </section>
+  </section>
+
+  <section id="performance" class="page hidden">
+    <div class="hero"><div><div class="eyebrow">ANALYTICS</div><h1>Journal Performance</h1><p>Analisis berdasarkan akun, strategi, timeframe, dan session.</p></div></div>
+    <section class="panel filters"><select id="fAccount"><option value="">Semua akun</option></select><select id="fStrategy"><option value="">Semua strategi</option></select><select id="fTF"><option value="">Semua timeframe</option></select><select id="fSession"><option value="">Semua session</option></select><input id="fFrom" type="date"><input id="fTo" type="date"><button id="fReset" class="secondary" type="button">Reset</button></section>
+    <div class="cards four"><div class="card"><small>Total Trade</small><strong id="pTrades">0</strong></div><div class="card"><small>Win Rate</small><strong id="pWR">0%</strong></div><div class="card"><small>Net P/L</small><strong id="pPL">$0.00</strong></div><div class="card"><small>Profit Factor</small><strong id="pPF">0.00</strong></div></div>
+    <div class="cards four"><div class="card"><small>Average Win</small><strong id="pAvgW">$0.00</strong></div><div class="card"><small>Average Loss</small><strong id="pAvgL">$0.00</strong></div><div class="card"><small>Expectancy</small><strong id="pExp">$0.00</strong></div><div class="card"><small>Max Drawdown</small><strong id="pDD">$0.00</strong></div></div>
+    <section class="panel"><div class="sectionHead"><h2>📈 Equity</h2><b id="pEq">$0.00</b></div><canvas id="perfChart"></canvas></section>
+    <div class="two"><section class="panel"><div class="sectionHead"><h2>🏦 Per Account</h2></div><div id="byAccount"></div></section><section class="panel"><div class="sectionHead"><h2>🧠 Per Strategy</h2></div><div id="byStrategy"></div></section></div>
+    <div class="two"><section class="panel"><div class="sectionHead"><h2>⏱️ Per Timeframe</h2></div><div id="byTF"></div></section><section class="panel"><div class="sectionHead"><h2>🌍 Per Session</h2></div><div id="bySession"></div></section></div>
+  </section>
+
+  <section id="accounts" class="page hidden"><div class="hero"><div><div class="eyebrow">PROP FIRM</div><h1>Accounts</h1><p>Kelola akun, target, drawdown, dan consistency.</p></div><button id="addAccount" class="primary adminOnly" type="button">＋ Tambah Akun</button></div><div id="accountsList" class="accountGrid"></div></section>
+  <section id="payouts" class="page hidden"><div class="hero"><div><div class="eyebrow">CASH FLOW</div><h1>Payouts</h1><p>Riwayat payout dari akun prop firm.</p></div><button id="addPayout" class="primary adminOnly" type="button">＋ Tambah Payout</button></div><section class="panel"><div id="payoutList"></div></section></section>
+
+  <section id="certificates" class="page hidden">
+    <div class="hero heroCert"><div><div class="eyebrow">PROP FIRM PROOF</div><h1>Sertifikat Payout</h1><p>Bukti sertifikat payout dari prop firm — upload dan tampilkan sebagai portofolio publik di portal.</p></div><button id="addCert" class="primary adminOnly" type="button">＋ Upload Sertifikat</button></div>
+    <div class="cards four">
+      <div class="card"><small>Total Sertifikat</small><strong id="certCount">0</strong></div>
+      <div class="card"><small>Total Payout Terverifikasi</small><strong id="certTotal">$0.00</strong></div>
+      <div class="card"><small>Prop Firm Terlibat</small><strong id="certFirms">0</strong></div>
+      <div class="card"><small>Sertifikat Terbaru</small><strong id="certLatest">—</strong></div>
+    </div>
+    <section class="panel">
+      <div class="sectionHead"><div><h2>🏆 Galeri Sertifikat</h2><small>Bukti payout yang sudah diverifikasi dan tampil publik</small></div></div>
+      <div id="certGrid" class="certGrid"><div class="emptyState"><svg width="46" height="46" viewBox="0 0 32 32" fill="none" aria-hidden="true"><circle cx="16" cy="12" r="7" stroke="currentColor" stroke-width="1.6" opacity=".5"/><path d="M11 18 L8 27 L16 23 L24 27 L21 18" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" opacity=".5"/></svg><div>Belum ada sertifikat payout yang diupload.</div></div></div>
+    </section>
+  </section>
+
+  <section id="calendar" class="page hidden"><div class="hero"><div><div class="eyebrow">TRADING DAYS</div><h1>Calendar</h1><p>Profit/loss per hari.</p></div></div><div class="calendarTools"><button id="prevMonth" class="secondary" type="button">‹</button><b id="monthTitle">—</b><button id="nextMonth" class="secondary" type="button">›</button><button id="todayMonth" class="secondary" type="button">Hari ini</button></div><section class="panel"><div id="calendarGrid" class="calendar"></div></section></section>
+  <section id="journal" class="page hidden"><div class="hero"><div><div class="eyebrow">TRADE LOG</div><h1>Trading Journal</h1><p>Jurnal trade yang tersimpan di Supabase.</p></div><div class="heroBtns"><button id="journalAdd" class="primary adminOnly" type="button">＋ Trade</button><button id="export" class="secondary" type="button">Export CSV</button></div></div><div class="cards four"><div class="card"><small>Total Trade</small><strong id="jTrades">0</strong></div><div class="card"><small>Win Rate</small><strong id="jWR">0%</strong></div><div class="card"><small>Net P/L</small><strong id="jPL">$0.00</strong></div><div class="card"><small>Max DD</small><strong id="jDD">$0.00</strong></div></div><section class="panel"><input id="search" placeholder="Cari symbol, strategi, session..."><div id="journalList" class="tradeList"></div></section></section>
 </main>
 
 <div id="loginModal" class="modal hidden"><div class="modalBox small"><div class="sectionHead"><h2>Admin Login</h2><button data-close="loginModal" class="iconBtn" type="button">×</button></div><form id="loginForm"><input id="email" type="email" placeholder="Email" required><input id="password" type="password" placeholder="Password" required><button class="primary" type="submit">Login</button><p id="loginMsg" class="msg"></p></form></div></div>
 <div id="tradeModal" class="modal hidden"><div class="modalBox"><div class="sectionHead"><h2>Tambah Trade</h2><button data-close="tradeModal" class="iconBtn" type="button">×</button></div><form id="tradeForm" class="formGrid"><select id="tAccount" required><option value="">Pilih akun</option></select><input id="tSymbol" placeholder="Symbol" required><select id="tSide"><option>BUY</option><option>SELL</option></select><input id="tEntry" type="number" step="any" placeholder="Entry"><input id="tExit" type="number" step="any" placeholder="Exit"><input id="tRisk" type="number" step="any" placeholder="Risk $"><input id="tPL" type="number" step="any" placeholder="P/L $" required><input id="tStrategy" placeholder="Strategy"><input id="tTF" placeholder="Timeframe"><input id="tSession" placeholder="Session"><textarea id="tNotes" placeholder="Catatan"></textarea><button class="primary full" type="submit">Simpan Trade</button></form><p id="tradeMsg" class="msg"></p></div></div>
 <div id="accountModal" class="modal hidden"><div class="modalBox"><div class="sectionHead"><h2>Prop Firm Account</h2><button data-close="accountModal" class="iconBtn" type="button">×</button></div><form id="accountForm" class="formGrid"><input id="aFirm" placeholder="Prop Firm" required><input id="aName" placeholder="Nama akun / ID" required><input id="aSize" type="number" step="any" placeholder="Account Size $" required><input id="aFee" type="number" step="any" placeholder="Purchase Fee $" value="0"><select id="aStatus"><option>Phase 1</option><option>Phase 2</option><option>Funded</option><option>Payout</option><option>Failed</option><option>Closed</option></select><input id="aTarget" type="number" step="any" value="6" placeholder="Target %"><input id="aDD" type="number" step="any" value="4" placeholder="Max DD %"><input id="aDaily" type="number" step="any" value="2" placeholder="Daily Loss %"><input id="aCons" type="number" step="any" value="20" placeholder="Consistency %"><input id="aStart" type="date"><textarea id="aNotes" placeholder="Catatan"></textarea><button class="primary full" type="submit">Simpan Akun</button></form><p id="accountMsg" class="msg"></p></div></div>
 <div id="payoutModal" class="modal hidden"><div class="modalBox small"><div class="sectionHead"><h2>Tambah Payout</h2><button data-close="payoutModal" class="iconBtn" type="button">×</button></div><form id="payoutForm"><select id="pAccount" required><option value="">Pilih akun</option></select><input id="pAmount" type="number" step="any" placeholder="Payout $" required><input id="pDate" type="date" required><select id="pStatus"><option>Paid</option><option>Pending</option><option>Rejected</option></select><textarea id="pNote" placeholder="Catatan"></textarea><button class="primary" type="submit">Simpan Payout</button></form><p id="payoutMsg" class="msg"></p></div></div>
+<div id="certModal" class="modal hidden"><div class="modalBox"><div class="sectionHead"><h2>Upload Sertifikat Payout</h2><button data-close="certModal" class="iconBtn" type="button">×</button></div><form id="certForm" class="formGrid"><select id="cAccount" required><option value="">Pilih akun</option></select><input id="cAmount" type="number" step="any" placeholder="Jumlah Payout $" required><input id="cDate" type="date" required><input id="cFirm" placeholder="Nama Prop Firm (opsional)"><input id="cFile" type="file" accept="image/*,.pdf" required class="full"><textarea id="cNote" placeholder="Catatan" class="full"></textarea><button class="primary full" type="submit">Simpan Sertifikat</button></form><p id="certMsg" class="msg"></p></div></div>
 <div id="errorModal" class="modal hidden"><div class="modalBox small"><div class="sectionHead"><h2>Portal Status</h2><button data-close="errorModal" class="iconBtn" type="button">×</button></div><p id="errorText" class="msg"></p><button data-close="errorModal" class="secondary full" type="button">Tutup</button></div></div>
-<script src="app.js?v=INZAKI_V7_20260928"></script>
+<script src="app.js?v=INZAKI_V8_20260928"></script>
 </body></html>

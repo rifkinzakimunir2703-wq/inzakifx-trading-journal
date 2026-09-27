@@ -25,9 +25,10 @@
     if(cfg()){ window.__INZAKI_SUPABASE__={url:getUrl(),key:key()}; return window.supabase.createClient(getUrl(),key()); }
     return null;
   }
-  let sb=null, user=null, ownerId=null, trades=[], accounts=[], payouts=[], eaTrades=[], eaSnapshots=[];
+  let sb=null, user=null, ownerId=null, trades=[], accounts=[], payouts=[], certificates=[], eaTrades=[], eaSnapshots=[];
   let monthCursor=new Date(); let editingAccount=null; let eaTimer=null; let eaMonthCursor=new Date(); let gEaMonthCursor=new Date();
-  const EA_CONSISTENCY_TARGET=30; // % — hari terbaik tidak boleh melebihi X% dari total profit
+  const EA_CONSISTENCY_TARGET=15; // % — hari terbaik tidak boleh melebihi X% dari total profit (per akun)
+  const CERT_BUCKET='certificates'; // nama bucket Supabase Storage untuk sertifikat payout
   const EA_R_TARGET=6; // target +6R
   const EA_R_UNIT_PCT=1; // 1R diasumsikan = 1% dari balance akun
 
@@ -56,11 +57,11 @@
       ownerId=user.id;
       setStatus('');
       await loadAll(true);
-      openPage('global');
+      openPage('ea');
     }else{
       await resolvePublicOwner();
       await loadAll(false);
-      openPage('journal');
+      openPage('ea');
       setStatus(ownerId?'View Only — data publik aktif.':'View Only belum dikonfigurasi: portal_public_owner belum memiliki owner.');
     }
     updateAdminUI();
@@ -76,11 +77,15 @@
   }
 
   async function loadAll(isAdmin){
-    trades=[];accounts=[];payouts=[];
+    trades=[];accounts=[];payouts=[];certificates=[];
     if(!ownerId){renderAll();return;}
-    await Promise.all([loadTrades(),loadAccounts(),loadPayouts()]);
+    await Promise.all([loadTrades(),loadAccounts(),loadPayouts(),loadCertificates()]);
     renderAll();
     if(isAdmin) await loadPropSilently();
+  }
+  async function loadCertificates(){
+    const {data,error}=await sb.from('payout_certificates').select('*').eq('user_id',ownerId).order('cert_date',{ascending:false});
+    if(error){console.warn('certificates',error);certificates=[];return} certificates=data||[];
   }
   async function loadTrades(){
     const {data,error}=await sb.from('trades').select('*').eq('user_id',ownerId).order('trade_date',{ascending:true});
@@ -107,13 +112,14 @@
     if(id==='performance')renderPerformance();
     if(id==='accounts')renderAccounts();
     if(id==='payouts')renderPayouts();
+    if(id==='certificates')renderCertificates();
     if(id==='calendar')renderCalendar();
     if(id==='journal')renderJournal();
     if(id==='ea'||id==='global')loadEA();
     window.scrollTo({top:0,behavior:'smooth'});
   }
 
-  function renderAll(){renderGlobal();renderPerformance();renderAccounts();renderPayouts();renderCalendar();renderJournal();fillAccountSelects();}
+  function renderAll(){renderGlobal();renderPerformance();renderAccounts();renderPayouts();renderCertificates();renderCalendar();renderJournal();fillAccountSelects();}
   function stats(rows){
     const vals=rows.map(t=>Number(t.pl)||0), wins=vals.filter(v=>v>0), losses=vals.filter(v=>v<0), gp=wins.reduce((a,v)=>a+v,0), gl=Math.abs(losses.reduce((a,v)=>a+v,0));
     let eq=0,peak=0,dd=0;vals.forEach(v=>{eq+=v;peak=Math.max(peak,eq);dd=Math.max(dd,peak-eq)});
@@ -137,7 +143,60 @@
   function renderPerformance(){setupFilters();const ts=filteredTrades(),s=stats(ts);setText('pTrades',s.n);setText('pWR',s.wr.toFixed(1)+'%');setText('pPL',money(s.net));setText('pPF',s.pf.toFixed(2));setText('pAvgW',money(s.avgW));setText('pAvgL',money(-s.avgL));setText('pExp',money(s.exp));setText('pDD',money(-s.dd));setText('pEq',money(s.net));valueClass('pPL',s.net);drawChart($('perfChart'),ts);groupBox('byAccount',ts,t=>{const a=accounts.find(x=>x.id===t.account_id);return a?`${a.firm} — ${a.account_name}`:'Tanpa akun'});groupBox('byStrategy',ts,t=>t.strategy||'Tanpa strategi');groupBox('byTF',ts,t=>t.timeframe||'Tanpa TF');groupBox('bySession',ts,t=>t.session||'Tanpa session')}
   function groupBox(id,rows,keyFn){const map={};rows.forEach(t=>{const k=keyFn(t),v=Number(t.pl)||0;if(!map[k])map[k]={n:0,w:0,l:0,pl:0};map[k].n++;map[k].pl+=v;if(v>0)map[k].w++;if(v<0)map[k].l++});$(id).innerHTML=Object.entries(map).sort((a,b)=>b[1].pl-a[1].pl).map(([k,v])=>`<div class="trade"><div><b>${esc(k)}</b><span>${v.n?((v.w/v.n)*100).toFixed(1):0}% WR</span></div><small>${v.n} trade · ${v.w}W / ${v.l}L · <b class="${v.pl>=0?'positive':'negative'}">${money(v.pl)}</b></small></div>`).join('')||'<p class="muted">Belum ada data.</p>'}
 
-  function fillAccountSelects(){const opts=accounts.map(a=>({v:a.id,t:`${a.firm} — ${a.account_name}`}));fillSelect('tAccount',opts,'Pilih akun');fillSelect('pAccount',opts,'Pilih akun')}
+  function fillAccountSelects(){const opts=accounts.map(a=>({v:a.id,t:`${a.firm} — ${a.account_name}`}));fillSelect('tAccount',opts,'Pilih akun');fillSelect('pAccount',opts,'Pilih akun');fillSelect('cAccount',opts,'Pilih akun')}
+  const pdfIconSvg='<svg width="40" height="40" viewBox="0 0 32 32" fill="none" aria-hidden="true"><rect x="6" y="3" width="20" height="26" rx="2" fill="#1a232d" stroke="#ff6f6f" stroke-width="1.4"/><path d="M18 3 L26 11 L18 11 Z" fill="#ff6f6f" opacity=".55"/><text x="16" y="21" text-anchor="middle" font-size="7" font-weight="800" fill="#ff8f8f" font-family="Inter,sans-serif">PDF</text></svg>';
+  function renderCertificates(){
+    if(!$('certGrid'))return;
+    const total=certificates.reduce((s,c)=>s+Number(c.amount||0),0);
+    const firms=new Set(certificates.map(c=>(c.firm||'').trim()).filter(Boolean));
+    setText('certCount',certificates.length);setText('certTotal',money(total));setText('certFirms',firms.size);
+    setText('certLatest',certificates[0]?.cert_date?new Date(certificates[0].cert_date).toLocaleDateString('id-ID'):'—');
+    if(!certificates.length){
+      $('certGrid').innerHTML=`<div class="emptyState"><svg width="46" height="46" viewBox="0 0 32 32" fill="none" aria-hidden="true"><circle cx="16" cy="12" r="7" stroke="currentColor" stroke-width="1.6" opacity=".5"/><path d="M11 18 L8 27 L16 23 L24 27 L21 18" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" opacity=".5"/></svg><div>Belum ada sertifikat payout${user?'. Klik “+ Upload Sertifikat” untuk menambahkan.':' yang diupload.'}</div></div>`;
+      return;
+    }
+    $('certGrid').innerHTML=certificates.map((c,idx)=>{
+      const a=accounts.find(x=>x.id===c.account_id);
+      const isPdf=/pdf/i.test(c.file_type||'')||/\.pdf(\?|$)/i.test(c.file_url||'');
+      return `<article class="certCard" style="animation-delay:${Math.min(idx,10)*.04}s">
+        <div class="certThumb">${isPdf?pdfIconSvg:`<img src="${esc(c.file_url)}" alt="Sertifikat payout" loading="lazy">`}<span class="certBadge">✔ Verified</span></div>
+        <div class="certBody">
+          <div class="certTop"><b class="positive">${money(c.amount)}</b><span class="tag">${esc(c.firm||a?.firm||'—')}</span></div>
+          <small>${esc(a?a.firm+' — '+a.account_name:'Tanpa akun')}</small>
+          <small class="muted">${c.cert_date?new Date(c.cert_date).toLocaleDateString('id-ID'):'—'}${c.note?' · '+esc(c.note):''}</small>
+          <div class="certActions"><a href="${esc(c.file_url)}" target="_blank" rel="noopener" class="secondary">Lihat</a>${user?`<button class="secondary" data-delete-cert="${c.id}">Hapus</button>`:''}</div>
+        </div>
+      </article>`;
+    }).join('');
+  }
+  async function saveCertificate(e){
+    e.preventDefault();
+    if(!user)return msg('certMsg','Login admin diperlukan.');
+    const file=$('cFile').files[0];
+    if(!file)return msg('certMsg','Pilih file sertifikat (gambar atau PDF).');
+    msg('certMsg','Mengupload sertifikat...');
+    try{
+      const ext=(file.name.split('.').pop()||'file').toLowerCase().replace(/[^a-z0-9]/g,'')||'file';
+      const path=`${user.id}/${Date.now()}_${Math.random().toString(36).slice(2,8)}.${ext}`;
+      const up=await sb.storage.from(CERT_BUCKET).upload(path,file,{contentType:file.type||'application/octet-stream',upsert:false});
+      if(up.error)throw up.error;
+      const pub=sb.storage.from(CERT_BUCKET).getPublicUrl(path);
+      const fileUrl=pub?.data?.publicUrl;
+      if(!fileUrl)throw new Error('Gagal mendapatkan URL publik sertifikat.');
+      const row={user_id:user.id,account_id:$('cAccount').value||null,amount:num('cAmount'),cert_date:$('cDate').value,firm:$('cFirm').value.trim(),file_url:fileUrl,file_path:path,file_type:file.type||'',note:$('cNote').value.trim()};
+      const {error}=await sb.from('payout_certificates').insert(row);
+      if(error)throw error;
+      $('certForm').reset();show('certModal',false);await loadAll(true);
+    }catch(err){msg('certMsg',err.message||'Gagal upload sertifikat.')}
+  }
+  async function deleteCertificate(id){
+    if(!user)return; if(!confirm('Hapus sertifikat ini?'))return;
+    const c=certificates.find(x=>x.id===id);
+    const {error}=await sb.from('payout_certificates').delete().eq('id',id).eq('user_id',user.id);
+    if(error){alert(error.message);return}
+    if(c?.file_path)await sb.storage.from(CERT_BUCKET).remove([c.file_path]).catch(()=>{});
+    await loadAll(true);
+  }
   function renderAccounts(){$('accountsList').innerHTML=accounts.map(a=>{const rows=trades.filter(t=>t.account_id===a.id),pl=rows.reduce((s,t)=>s+Number(t.pl||0),0),target=Number(a.account_size||0)*Number(a.target_pct||0)/100,progress=target?Math.max(0,Math.min(100,pl/target*100)):0;return `<article class="panel accountCard"><div class="accountTop"><div><h2>${esc(a.firm)}</h2><small>${esc(a.account_name)}</small></div><span class="status">${esc(a.status||'—')}</span></div><div class="metricGrid"><div><small>Size</small><b>${money(a.account_size)}</b></div><div><small>Fee</small><b class="negative">${money(-Number(a.purchase_fee||0))}</b></div><div><small>Trading P/L</small><b class="${pl>=0?'positive':'negative'}">${money(pl)}</b></div><div><small>Target</small><b>${Number(a.target_pct||0)}%</b></div><div><small>Max DD</small><b>${Number(a.max_dd_pct||0)}%</b></div><div><small>Consistency</small><b>${Number(a.consistency_pct||0)}%</b></div></div><div class="progress"><i style="width:${progress}%"></i></div><div class="accountActions adminOnly"><button class="secondary" data-edit-account="${a.id}">Edit</button><button class="secondary" data-status-account="${a.id}">Status</button><button class="secondary" data-delete-account="${a.id}">Hapus</button></div></article>`}).join('')||'<div class="panel"><b>Belum ada akun Prop Firm.</b><p class="muted">Login admin untuk menambahkan akun.</p></div>';updateAdminUI()}
   function renderPayouts(){$('payoutList').innerHTML=payouts.map(p=>{const a=accounts.find(x=>x.id===p.account_id);return `<div class="trade"><div><b>${money(p.amount)}</b><span class="tag">${esc(p.status)}</span></div><small>${esc(a?.firm||'')} — ${esc(a?.account_name||'')} · ${esc(p.payout_date||'')}</small><small>${esc(p.note||'')}</small></div>`}).join('')||'<p class="muted">Belum ada payout.</p>'}
   function renderJournal(){const s=stats(trades);setText('jTrades',s.n);setText('jWR',s.wr.toFixed(1)+'%');setText('jPL',money(s.net));setText('jDD',money(-s.dd));valueClass('jPL',s.net);const q=($('search')?.value||'').toLowerCase();const rows=trades.slice().reverse().filter(t=>`${t.symbol||''} ${t.strategy||''} ${t.session||''}`.toLowerCase().includes(q));$('journalList').innerHTML=rows.map(t=>`<div class="trade"><div><b>${esc(t.symbol)}</b> <span class="tag">${esc(t.side)}</span><small>${new Date(t.trade_date).toLocaleString('id-ID')}</small></div><div><b class="${Number(t.pl)>=0?'positive':'negative'}">${money(t.pl)}</b>${user?` <button class="secondary" data-delete-trade="${t.id}">Hapus</button>`:''}</div><small>${esc(t.strategy||'')} · ${esc(t.timeframe||'')} · ${esc(t.session||'')}</small></div>`).join('')||'<p class="muted">Belum ada trade.</p>'}
@@ -255,6 +314,11 @@
           <div class="eaRuleBox"><div class="eaRuleHead"><span>📏 Consistency Rule</span><span class="ruleBadge ${cons.pass?'pass':'fail'}">${cons.pass?'PASS':'CEK'} · ${cons.ratio.toFixed(0)}%/${EA_CONSISTENCY_TARGET}%</span></div><small class="muted">Hari terbaik ${money(cons.bestDay)} dari total ${money(cons.total)}</small></div>
         </div>
         <div class="eaAccountFoot"><span>Last: ${lastTrade?.event?esc(lastTrade.event):esc(snap?.event||'—')}</span><span>${activity?new Date(activity).toLocaleString('id-ID'):'—'}</span></div>
+        <details class="eaHistory"><summary>📜 Riwayat Trade &amp; P/L (${closed.length})</summary>
+          <div class="eaHistoryScroll"><table><thead><tr><th>Waktu</th><th>Symbol</th><th>Side</th><th>Price</th><th>P/L</th></tr></thead><tbody>
+            ${closed.slice(0,20).map(t=>`<tr><td>${t.time?esc(new Date(t.time).toLocaleString('id-ID')):'—'}</td><td>${esc(t.symbol||'—')}</td><td>${esc(t.type||'—')}</td><td>${t.price??'—'}</td><td class="${Number(t.profit)>=0?'positive':'negative'}">${money(t.profit)}</td></tr>`).join('')||'<tr><td colspan="5" class="muted center">Belum ada trade closed.</td></tr>'}
+          </tbody></table></div>
+        </details>
       </article>`
     }).join('')
     renderEAGlobalStats(list);
@@ -335,8 +399,9 @@
     $('eaPrevMonth')?.addEventListener('click',()=>{eaMonthCursor.setMonth(eaMonthCursor.getMonth()-1);renderEACalendar()});$('eaNextMonth')?.addEventListener('click',()=>{eaMonthCursor.setMonth(eaMonthCursor.getMonth()+1);renderEACalendar()});$('eaTodayMonth')?.addEventListener('click',()=>{eaMonthCursor=new Date();renderEACalendar()});
     $('gEaAccountFilter')?.addEventListener('change',renderGlobalEACalendar);$('gEaPrevMonth')?.addEventListener('click',()=>{gEaMonthCursor.setMonth(gEaMonthCursor.getMonth()-1);renderGlobalEACalendar()});$('gEaNextMonth')?.addEventListener('click',()=>{gEaMonthCursor.setMonth(gEaMonthCursor.getMonth()+1);renderGlobalEACalendar()});$('gEaTodayMonth')?.addEventListener('click',()=>{gEaMonthCursor=new Date();renderGlobalEACalendar()});['quickTrade','journalAdd'].forEach(id=>$(id)?.addEventListener('click',()=>{fillAccountSelects();show('tradeModal',true)}));
     $('tradeForm')?.addEventListener('submit',saveTrade);$('addAccount')?.addEventListener('click',()=>{editingAccount=null;$('accountForm').reset();show('accountModal',true)});$('accountForm')?.addEventListener('submit',saveAccount);$('addPayout')?.addEventListener('click',()=>{fillAccountSelects();show('payoutModal',true)});$('payoutForm')?.addEventListener('submit',savePayout);
+    $('addCert')?.addEventListener('click',()=>{fillAccountSelects();$('certForm')?.reset();msg('certMsg','');show('certModal',true)});$('certForm')?.addEventListener('submit',saveCertificate);
     $('prevMonth')?.addEventListener('click',()=>{monthCursor.setMonth(monthCursor.getMonth()-1);renderCalendar()});$('nextMonth')?.addEventListener('click',()=>{monthCursor.setMonth(monthCursor.getMonth()+1);renderCalendar()});$('todayMonth')?.addEventListener('click',()=>{monthCursor=new Date();renderCalendar()});
-    document.addEventListener('click',e=>{const d=e.target.closest('[data-delete-trade]');if(d)deleteTrade(d.dataset.deleteTrade);const ed=e.target.closest('[data-edit-account]');if(ed)editAccount(ed.dataset.editAccount);const st=e.target.closest('[data-status-account]');if(st)changeStatus(st.dataset.statusAccount);const del=e.target.closest('[data-delete-account]');if(del)removeAccount(del.dataset.deleteAccount);const day=e.target.closest('[data-date]');if(day){const date=day.dataset.date;$('fFrom').value=date;$('fTo').value=date;openPage('performance')}});
+    document.addEventListener('click',e=>{const d=e.target.closest('[data-delete-trade]');if(d)deleteTrade(d.dataset.deleteTrade);const ed=e.target.closest('[data-edit-account]');if(ed)editAccount(ed.dataset.editAccount);const st=e.target.closest('[data-status-account]');if(st)changeStatus(st.dataset.statusAccount);const del=e.target.closest('[data-delete-account]');if(del)removeAccount(del.dataset.deleteAccount);const dc=e.target.closest('[data-delete-cert]');if(dc)deleteCertificate(dc.dataset.deleteCert);const day=e.target.closest('[data-date]');if(day){const date=day.dataset.date;$('fFrom').value=date;$('fTo').value=date;openPage('performance')}});
   }
   window.openPage=openPage;
   document.addEventListener('DOMContentLoaded',init);
