@@ -120,6 +120,40 @@
   }
 
   function renderAll(){renderGlobal();renderPerformance();renderAccounts();renderPayouts();renderCertificates();renderCalendar();renderJournal();fillAccountSelects();}
+
+  // --- Status akun propfirm: dikategorikan agar status lama (Phase 1/Funded/dll) & status baru (Aktif/Pass/Fail/Closed) tetap terhitung benar ---
+  function accountCategory(status){
+    const v=String(status||'').trim().toLowerCase();
+    if(!v)return'active';
+    if(v.includes('fail')||v.includes('gagal'))return'fail';
+    if(v.includes('pass')||v.includes('lulus')||v.includes('funded')||v.includes('payout'))return'pass';
+    if(v.includes('closed')||v.includes('tutup'))return'closed';
+    return'active';
+  }
+  function canonicalStatus(status){const c=accountCategory(status);return c==='pass'?'Pass':c==='fail'?'Fail':c==='closed'?'Closed':'Aktif';}
+  function findLinkedAccount(mt5){const k=String(mt5??'').trim();if(!k)return null;return accounts.find(x=>String(x.mt5_account||'').trim()===k)||null;}
+  function propfirmStats(){
+    let total=accounts.length,active=0,pass=0,fail=0,closed=0;
+    accounts.forEach(a=>{const c=accountCategory(a.status);if(c==='pass')pass++;else if(c==='fail')fail++;else if(c==='closed')closed++;else active++;});
+    return{total,active,pass,fail,closed};
+  }
+  function renderPropfirmStats(){
+    const s=propfirmStats();
+    setText('gpTotal',s.total);setText('gpActive',s.active);setText('gpPass',s.pass);setText('gpFail',s.fail);
+    setText('paTotal',s.total);setText('paActive',s.active);setText('paPass',s.pass);setText('paFail',s.fail);
+  }
+  async function setAccountStatus(id,status){
+    if(!user||!id)return;
+    const {error}=await sb.from('prop_accounts').update({status}).eq('id',id).eq('user_id',user.id);
+    if(error){alert(error.message);return}
+    await loadAccounts();
+    renderAll();renderEAAccounts();
+  }
+  function registerEaAsAccount(mt5){
+    editingAccount=null;$('accountForm').reset();
+    $('aMt5').value=mt5||'';$('aStatus').value='Aktif';
+    msg('accountMsg','');show('accountModal',true);
+  }
   function stats(rows){
     const vals=rows.map(t=>Number(t.pl)||0), wins=vals.filter(v=>v>0), losses=vals.filter(v=>v<0), gp=wins.reduce((a,v)=>a+v,0), gl=Math.abs(losses.reduce((a,v)=>a+v,0));
     let eq=0,peak=0,dd=0;vals.forEach(v=>{eq+=v;peak=Math.max(peak,eq);dd=Math.max(dd,peak-eq)});
@@ -127,7 +161,7 @@
   }
   function renderGlobal(){
     const s=stats(trades), fees=accounts.reduce((a,x)=>a+Number(x.purchase_fee||0),0), pay=payouts.filter(x=>String(x.status).toLowerCase()==='paid').reduce((a,x)=>a+Number(x.amount||0),0);
-    setText('gPL',money(s.net));setText('gWR',s.wr.toFixed(1)+'%');setText('gTrades',s.n);setText('gPF',s.pf.toFixed(2));setText('gFees',money(-fees));setText('gPayout',money(pay));setText('gNet',money(pay-fees));setText('gAccounts',accounts.length);valueClass('gPL',s.net);valueClass('gNet',pay-fees);drawChart($('equity'),trades);setText('equityLabel',money(s.net));
+    setText('gPL',money(s.net));setText('gWR',s.wr.toFixed(1)+'%');setText('gTrades',s.n);setText('gPF',s.pf.toFixed(2));setText('gFees',money(-fees));setText('gPayout',money(pay));setText('gNet',money(pay-fees));setText('gAccounts',accounts.length);valueClass('gPL',s.net);valueClass('gNet',pay-fees);drawChart($('equity'),trades);setText('equityLabel',money(s.net));renderPropfirmStats();
     $('accountOverview').innerHTML=accounts.map(a=>{const pl=trades.filter(t=>t.account_id===a.id).reduce((x,t)=>x+Number(t.pl||0),0);return `<div class="overviewRow"><div><b>${esc(a.firm||'')}</b><small class="muted">${esc(a.account_name||'')}</small></div><div><b class="${pl>=0?'positive':'negative'}">${money(pl)}</b><span class="status">${esc(a.status||'—')}</span></div></div>`}).join('')||'<p class="muted">Belum ada akun.</p>';
   }
   function setText(id,v){if($(id))$(id).textContent=v}
@@ -197,19 +231,31 @@
     if(c?.file_path)await sb.storage.from(CERT_BUCKET).remove([c.file_path]).catch(()=>{});
     await loadAll(true);
   }
-  function renderAccounts(){$('accountsList').innerHTML=accounts.map(a=>{const rows=trades.filter(t=>t.account_id===a.id),pl=rows.reduce((s,t)=>s+Number(t.pl||0),0),target=Number(a.account_size||0)*Number(a.target_pct||0)/100,progress=target?Math.max(0,Math.min(100,pl/target*100)):0;return `<article class="panel accountCard"><div class="accountTop"><div><h2>${esc(a.firm)}</h2><small>${esc(a.account_name)}</small></div><span class="status">${esc(a.status||'—')}</span></div><div class="metricGrid"><div><small>Size</small><b>${money(a.account_size)}</b></div><div><small>Fee</small><b class="negative">${money(-Number(a.purchase_fee||0))}</b></div><div><small>Trading P/L</small><b class="${pl>=0?'positive':'negative'}">${money(pl)}</b></div><div><small>Target</small><b>${Number(a.target_pct||0)}%</b></div><div><small>Max DD</small><b>${Number(a.max_dd_pct||0)}%</b></div><div><small>Consistency</small><b>${Number(a.consistency_pct||0)}%</b></div></div><div class="progress"><i style="width:${progress}%"></i></div><div class="accountActions adminOnly"><button class="secondary" data-edit-account="${a.id}">Edit</button><button class="secondary" data-status-account="${a.id}">Status</button><button class="secondary" data-delete-account="${a.id}">Hapus</button></div></article>`}).join('')||'<div class="panel"><b>Belum ada akun Prop Firm.</b><p class="muted">Login admin untuk menambahkan akun.</p></div>';updateAdminUI()}
+  function renderAccounts(){
+    renderPropfirmStats();
+    $('accountsList').innerHTML=accounts.map(a=>{
+      const linkedEa=String(a.mt5_account||'').trim();
+      const eaData=linkedEa?eaAccountsData().find(x=>x.account===linkedEa):null;
+      let pl,tradeCount,wr;
+      if(eaData){const closed=eaData.rows.filter(isClosedEA);const st=stats(closed.map(x=>({pl:Number(x.profit||0)})));pl=st.net;tradeCount=closed.length;wr=st.wr;}
+      else{const rows=trades.filter(t=>t.account_id===a.id);const st=stats(rows.map(t=>({pl:Number(t.pl||0)})));pl=st.net;tradeCount=st.n;wr=st.wr;}
+      const target=Number(a.account_size||0)*Number(a.target_pct||0)/100,progress=target?Math.max(0,Math.min(100,pl/target*100)):0;
+      const cat=accountCategory(a.status),sel=canonicalStatus(a.status);
+      return `<article class="panel accountCard"><div class="accountTop"><div><h2>${esc(a.firm)}</h2><small>${esc(a.account_name)}</small>${linkedEa?`<span class="accountLinkTag">🖥️ MT5 #${esc(linkedEa)}${eaData?'':' · belum ada data trade'}</span>`:'<span class="accountLinkTag">Belum terhubung ke akun MT5</span>'}</div><span class="status ${cat}">${esc(a.status||'—')}</span></div><div class="metricGrid"><div><small>Size</small><b>${money(a.account_size)}</b></div><div><small>Fee</small><b class="negative">${money(-Number(a.purchase_fee||0))}</b></div><div><small>Trading P/L${linkedEa?' (Live)':''}</small><b class="${pl>=0?'positive':'negative'}">${money(pl)}</b></div><div><small>Trade${linkedEa?' Live':''}</small><b>${tradeCount} · ${wr.toFixed(1)}% WR</b></div><div><small>Target</small><b>${Number(a.target_pct||0)}%</b></div><div><small>Max DD</small><b>${Number(a.max_dd_pct||0)}%</b></div></div><div class="progress"><i style="width:${progress}%"></i></div><div class="accountActions adminOnly">${user?`<select class="miniSelect" data-status-select="${a.id}"><option value="Aktif" ${sel==='Aktif'?'selected':''}>Aktif</option><option value="Pass" ${sel==='Pass'?'selected':''}>Pass</option><option value="Fail" ${sel==='Fail'?'selected':''}>Fail</option><option value="Closed" ${sel==='Closed'?'selected':''}>Closed</option></select>`:''}<button class="secondary" data-edit-account="${a.id}">Edit</button><button class="secondary" data-delete-account="${a.id}">Hapus</button></div></article>`
+    }).join('')||'<div class="panel"><b>Belum ada akun Prop Firm.</b><p class="muted">Login admin untuk menambahkan akun.</p></div>';
+    updateAdminUI();
+  }
   function renderPayouts(){$('payoutList').innerHTML=payouts.map(p=>{const a=accounts.find(x=>x.id===p.account_id);return `<div class="trade"><div><b>${money(p.amount)}</b><span class="tag">${esc(p.status)}</span></div><small>${esc(a?.firm||'')} — ${esc(a?.account_name||'')} · ${esc(p.payout_date||'')}</small><small>${esc(p.note||'')}</small></div>`}).join('')||'<p class="muted">Belum ada payout.</p>'}
   function renderJournal(){const s=stats(trades);setText('jTrades',s.n);setText('jWR',s.wr.toFixed(1)+'%');setText('jPL',money(s.net));setText('jDD',money(-s.dd));valueClass('jPL',s.net);const q=($('search')?.value||'').toLowerCase();const rows=trades.slice().reverse().filter(t=>`${t.symbol||''} ${t.strategy||''} ${t.session||''}`.toLowerCase().includes(q));$('journalList').innerHTML=rows.map(t=>`<div class="trade"><div><b>${esc(t.symbol)}</b> <span class="tag">${esc(t.side)}</span><small>${new Date(t.trade_date).toLocaleString('id-ID')}</small></div><div><b class="${Number(t.pl)>=0?'positive':'negative'}">${money(t.pl)}</b>${user?` <button class="secondary" data-delete-trade="${t.id}">Hapus</button>`:''}</div><small>${esc(t.strategy||'')} · ${esc(t.timeframe||'')} · ${esc(t.session||'')}</small></div>`).join('')||'<p class="muted">Belum ada trade.</p>'}
-  function renderCalendar(){const y=monthCursor.getFullYear(),m=monthCursor.getMonth(),first=new Date(y,m,1).getDay(),days=new Date(y,m+1,0).getDate();$('monthTitle').textContent=new Date(y,m,1).toLocaleDateString('id-ID',{month:'long',year:'numeric'});let h=['Min','Sen','Sel','Rab','Kam','Jum','Sab'].map(x=>`<div class="calHead">${x}</div>`).join('');for(let i=0;i<first;i++)h+='<div></div>';for(let d=1;d<=days;d++){const key=`${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`,pl=trades.filter(t=>String(t.trade_date||'').slice(0,10)===key).reduce((s,t)=>s+Number(t.pl||0),0);h+=`<button class="calDay ${pl>0?'calWin':pl<0?'calLoss':''} ${key===new Date().toISOString().slice(0,10)?'calToday':''}" data-date="${key}"><b>${d}</b><small>${pl?money(pl):'—'}</small></button>`}$('calendarGrid').innerHTML=h}
+  function renderCalendar(){buildEACalendarGrid('calendarGrid','monthTitle',monthCursor,eaTrades.filter(isClosedEA))}
 
   async function saveTrade(e){e.preventDefault();if(!user)return msg('tradeMsg','Login admin diperlukan.');msg('tradeMsg','Menyimpan...');const row={user_id:user.id,account_id:$('tAccount').value||null,trade_date:new Date().toISOString(),symbol:$('tSymbol').value.trim().toUpperCase(),side:$('tSide').value,entry:num('tEntry'),exit:num('tExit'),risk:num('tRisk'),pl:num('tPL'),strategy:$('tStrategy').value.trim(),timeframe:$('tTF').value.trim(),session:$('tSession').value.trim(),notes:$('tNotes').value.trim()};const {error}=await sb.from('trades').insert(row);if(error){msg('tradeMsg',error.message);return}$('tradeForm').reset();show('tradeModal',false);await loadAll(true)}
-  async function saveAccount(e){e.preventDefault();if(!user)return msg('accountMsg','Login admin diperlukan.');msg('accountMsg','Menyimpan...');const row={firm:$('aFirm').value.trim(),account_name:$('aName').value.trim(),account_size:num('aSize'),purchase_fee:num('aFee'),status:$('aStatus').value,target_pct:num('aTarget'),max_dd_pct:num('aDD'),daily_loss_pct:num('aDaily'),consistency_pct:num('aCons'),start_date:$('aStart').value||null,notes:$('aNotes').value.trim()};let q=editingAccount?sb.from('prop_accounts').update(row).eq('id',editingAccount).eq('user_id',user.id):sb.from('prop_accounts').insert({...row,user_id:user.id});const {error}=await q;if(error){msg('accountMsg',error.message);return}editingAccount=null;$('accountForm').reset();show('accountModal',false);await loadAll(true)}
+  async function saveAccount(e){e.preventDefault();if(!user)return msg('accountMsg','Login admin diperlukan.');msg('accountMsg','Menyimpan...');const row={firm:$('aFirm').value.trim(),account_name:$('aName').value.trim(),mt5_account:$('aMt5').value.trim()||null,account_size:num('aSize'),purchase_fee:num('aFee'),status:$('aStatus').value,target_pct:num('aTarget'),max_dd_pct:num('aDD'),daily_loss_pct:num('aDaily'),consistency_pct:num('aCons'),start_date:$('aStart').value||null,notes:$('aNotes').value.trim()};let q=editingAccount?sb.from('prop_accounts').update(row).eq('id',editingAccount).eq('user_id',user.id):sb.from('prop_accounts').insert({...row,user_id:user.id});const {error}=await q;if(error){msg('accountMsg',error.message);return}editingAccount=null;$('accountForm').reset();show('accountModal',false);await loadAll(true)}
   async function savePayout(e){e.preventDefault();if(!user)return msg('payoutMsg','Login admin diperlukan.');msg('payoutMsg','Menyimpan...');const row={user_id:user.id,account_id:$('pAccount').value,amount:num('pAmount'),payout_date:$('pDate').value,status:$('pStatus').value,note:$('pNote').value.trim()};const {error}=await sb.from('payouts').insert(row);if(error){msg('payoutMsg',error.message);return}$('payoutForm').reset();show('payoutModal',false);await loadAll(true)}
   const num=id=>{const n=parseFloat($(id)?.value);return Number.isFinite(n)?n:0};
 
   async function deleteTrade(id){if(!user)return; if(!confirm('Hapus trade ini?'))return;const {error}=await sb.from('trades').delete().eq('id',id).eq('user_id',user.id);if(error)alert(error.message);else await loadAll(true)}
-  async function editAccount(id){const a=accounts.find(x=>x.id===id);if(!a)return;editingAccount=id;$('aFirm').value=a.firm||'';$('aName').value=a.account_name||'';$('aSize').value=a.account_size??'';$('aFee').value=a.purchase_fee??0;$('aStatus').value=a.status||'Phase 1';$('aTarget').value=a.target_pct??6;$('aDD').value=a.max_dd_pct??4;$('aDaily').value=a.daily_loss_pct??2;$('aCons').value=a.consistency_pct??20;$('aStart').value=a.start_date||'';$('aNotes').value=a.notes||'';show('accountModal',true)}
-  async function changeStatus(id){const a=accounts.find(x=>x.id===id);if(!a)return;const s=prompt('Status: Phase 1, Phase 2, Funded, Payout, Failed, Closed',a.status||'Phase 1');if(!s)return;const {error}=await sb.from('prop_accounts').update({status:s}).eq('id',id).eq('user_id',user.id);if(error)alert(error.message);else await loadAll(true)}
+  async function editAccount(id){const a=accounts.find(x=>x.id===id);if(!a)return;editingAccount=id;$('aFirm').value=a.firm||'';$('aName').value=a.account_name||'';$('aMt5').value=a.mt5_account||'';$('aSize').value=a.account_size??'';$('aFee').value=a.purchase_fee??0;$('aStatus').value=canonicalStatus(a.status);$('aTarget').value=a.target_pct??6;$('aDD').value=a.max_dd_pct??4;$('aDaily').value=a.daily_loss_pct??2;$('aCons').value=a.consistency_pct??20;$('aStart').value=a.start_date||'';$('aNotes').value=a.notes||'';show('accountModal',true)}
   async function removeAccount(id){if(!confirm('Hapus akun ini? Data trade tidak ikut dihapus.'))return;const {error}=await sb.from('prop_accounts').delete().eq('id',id).eq('user_id',user.id);if(error)alert(error.message);else await loadAll(true)}
 
   async function loadEA(){
@@ -220,7 +266,7 @@
     ]);
     if(tradeRes.error){
       eaTrades=[];
-      $('eaBody').innerHTML=`<tr><td colspan="8" class="muted center">EA table belum siap: ${esc(tradeRes.error.message)}</td></tr>`;
+      $('eaBody').innerHTML=`<tr><td colspan="8" class="muted center">Data trading belum siap: ${esc(tradeRes.error.message)}</td></tr>`;
     } else eaTrades=tradeRes.data||[];
     if(snapRes.error){
       eaSnapshots=[];
@@ -254,6 +300,7 @@
   }
 
   function isClosedEA(x){const e=String(x.event||'').toLowerCase();return e.includes('close')||e.includes('result')||e.includes('closed');}
+  function totalPips(rows){return rows.reduce((s,x)=>s+Number(x.pips||0),0);}
 
   function eaDayKey(t){return t?new Date(t).toISOString().slice(0,10):null;}
   function eaDailyPL(rows){
@@ -277,6 +324,16 @@
     return {r,pct};
   }
 
+  function eaAccountStatusBlock(mt5){
+    const linked=findLinkedAccount(mt5);
+    if(!linked){
+      return user?`<div class="eaAccountStatusRow"><span class="status">Belum terdaftar sebagai akun propfirm</span><button class="secondary" data-register-ea="${esc(mt5)}">＋ Daftarkan Akun Propfirm</button></div>`
+        :`<div class="eaAccountStatusRow"><span class="status">Belum terdaftar</span></div>`;
+    }
+    const cat=accountCategory(linked.status),sel=canonicalStatus(linked.status);
+    if(!user)return `<div class="eaAccountStatusRow"><span class="status ${cat}">${esc(linked.firm)} · ${esc(linked.status||'—')}</span></div>`;
+    return `<div class="eaAccountStatusRow"><span class="status ${cat}">${esc(linked.firm)} — ${esc(linked.account_name)}</span><select class="miniSelect" data-status-select="${linked.id}"><option value="Aktif" ${sel==='Aktif'?'selected':''}>Aktif</option><option value="Pass" ${sel==='Pass'?'selected':''}>Pass</option><option value="Fail" ${sel==='Fail'?'selected':''}>Fail</option><option value="Closed" ${sel==='Closed'?'selected':''}>Closed</option></select></div>`;
+  }
   function renderEAAccounts(){
     const list=eaAccountsData();
     const filter=$('eaAccountFilter')?.value||'';
@@ -290,7 +347,7 @@
       $('gEaAccountFilter').innerHTML='<option value="">Semua akun</option>'+list.map(a=>`<option value="${esc(a.account)}">${esc(a.account)}${a.broker&&a.broker!=='—'?' · '+esc(a.broker):''}</option>`).join('');
       $('gEaAccountFilter').value=list.some(a=>a.account===gold)?gold:'';
     }
-    if(!list.length){$('eaAccounts').innerHTML='<div class="emptyState"><svg width="46" height="46" viewBox="0 0 32 32" fill="none" aria-hidden="true"><circle cx="16" cy="16" r="14" stroke="currentColor" stroke-width="1.6" opacity=".35"/><path d="M9 19 L13 13 L17 16 L23 9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><div>Belum ada akun EA. Setelah EA mengirim trade, akun MT5 akan muncul otomatis di sini.</div></div>';return}
+    if(!list.length){$('eaAccounts').innerHTML='<div class="emptyState"><svg width="46" height="46" viewBox="0 0 32 32" fill="none" aria-hidden="true"><circle cx="16" cy="16" r="14" stroke="currentColor" stroke-width="1.6" opacity=".35"/><path d="M9 19 L13 13 L17 16 L23 9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><div>Belum ada akun terdeteksi. Setelah sistem trading mengirim trade, akun MT5 akan muncul otomatis di sini.</div></div>';return}
     $('eaAccounts').innerHTML=list.map((a,idx)=>{
       const closed=a.rows.filter(isClosedEA); const st=stats(closed.map(x=>({pl:Number(x.profit||0)})));
       const snap=latestSnapshot(a.account);
@@ -305,15 +362,17 @@
       const rt=eaRProgress(balance||equity,pnl);
       const daily=eaDailyPL(closed); const dvals=[...daily.values()];
       const bestDay=dvals.length?Math.max(...dvals):0, worstDay=dvals.length?Math.min(...dvals):0;
+      const pips=totalPips(closed);
       return `<article class="eaAccountCard ${online?'eaOnline':'eaOffline'}" data-ea-account-card="${esc(a.account)}" style="animation-delay:${Math.min(idx,8)*.05}s">
         <div class="eaAccountTop"><div><div class="eaAccountName">${esc(a.account)}</div><small>${esc(snap?.broker||a.broker)} · ${esc(snap?.symbol||a.symbol)}</small></div><span class="eaStatus ${online?'online':'offline'}"><i></i>${online?'ONLINE':'OFFLINE'}</span></div>
-        <div class="eaMiniGrid"><div><small>Balance</small><b>${money(balance)}</b></div><div><small>Equity</small><b>${money(equity)}</b></div><div><small>Today P/L</small><b class="${Number(snap?.today_pl||0)>=0?'positive':'negative'}">${money(snap?.today_pl||0)}</b></div><div><small>Floating</small><b class="${Number(snap?.floating_profit||0)>=0?'positive':'negative'}">${money(snap?.floating_profit||0)}</b></div><div><small>Trades</small><b>${closed.length}</b></div><div><small>Win Rate</small><b>${st.wr.toFixed(1)}%</b></div><div><small>PF</small><b>${st.pf.toFixed(2)}</b></div><div><small>DD Est.</small><b>${ddPct.toFixed(1)}%</b></div><div><small>Avg Win</small><b class="positive">${money(st.avgW)}</b></div><div><small>Avg Loss</small><b class="negative">${money(-st.avgL)}</b></div><div><small>Expectancy</small><b class="${st.exp>=0?'positive':'negative'}">${money(st.exp)}</b></div><div><small>Max DD $</small><b class="negative">${money(-st.dd)}</b></div><div><small>Best Day</small><b class="positive">${money(bestDay)}</b></div><div><small>Worst Day</small><b class="negative">${money(worstDay)}</b></div><div><small>Net P/L</small><b class="${pnl>=0?'positive':'negative'}">${money(pnl)}</b></div><div><small>W/L</small><b>${st.w}/${st.l}</b></div></div>
+        <div class="eaMiniGrid"><div><small>Balance</small><b>${money(balance)}</b></div><div><small>Equity</small><b>${money(equity)}</b></div><div><small>Today P/L</small><b class="${Number(snap?.today_pl||0)>=0?'positive':'negative'}">${money(snap?.today_pl||0)}</b></div><div><small>Floating</small><b class="${Number(snap?.floating_profit||0)>=0?'positive':'negative'}">${money(snap?.floating_profit||0)}</b></div><div><small>Trades</small><b>${closed.length}</b></div><div><small>Win Rate</small><b>${st.wr.toFixed(1)}%</b></div><div><small>Pips</small><b class="${pips>=0?'positive':'negative'}">${pips.toFixed(1)}</b></div><div><small>PF</small><b>${st.pf.toFixed(2)}</b></div><div><small>DD Est.</small><b>${ddPct.toFixed(1)}%</b></div><div><small>Avg Win</small><b class="positive">${money(st.avgW)}</b></div><div><small>Avg Loss</small><b class="negative">${money(-st.avgL)}</b></div><div><small>Expectancy</small><b class="${st.exp>=0?'positive':'negative'}">${money(st.exp)}</b></div><div><small>Max DD $</small><b class="negative">${money(-st.dd)}</b></div><div><small>Best Day</small><b class="positive">${money(bestDay)}</b></div><div><small>Worst Day</small><b class="negative">${money(worstDay)}</b></div><div><small>Net P/L</small><b class="${pnl>=0?'positive':'negative'}">${money(pnl)}</b></div><div><small>W/L</small><b>${st.w}/${st.l}</b></div></div>
         <div class="eaMLLine"><span>ML ${(Number(snap?.ml_probability||0)*100).toFixed(1)}%</span><span>Risk ×${Number(snap?.adaptive_risk||1).toFixed(2)}</span><span>Samples ${Number(snap?.ml_samples||0)}</span><span>WF ${snap?.wf_enabled?'ON':'OFF'} ${Number(snap?.wf_valid_folds||0)}/${Number(snap?.wf_folds||0)}</span></div>
         <div class="eaRuleRow">
           <div class="eaRuleBox"><div class="eaRuleHead"><span>🎯 Target +${EA_R_TARGET}R</span><b>${rt.r.toFixed(2)}R</b></div><div class="progress thin"><i style="width:${rt.pct}%"></i></div></div>
           <div class="eaRuleBox"><div class="eaRuleHead"><span>📏 Consistency Rule</span><span class="ruleBadge ${cons.pass?'pass':'fail'}">${cons.pass?'PASS':'CEK'} · ${cons.ratio.toFixed(0)}%/${EA_CONSISTENCY_TARGET}%</span></div><small class="muted">Hari terbaik ${money(cons.bestDay)} dari total ${money(cons.total)}</small></div>
         </div>
         <div class="eaAccountFoot"><span>Last: ${lastTrade?.event?esc(lastTrade.event):esc(snap?.event||'—')}</span><span>${activity?new Date(activity).toLocaleString('id-ID'):'—'}</span></div>
+        ${eaAccountStatusBlock(a.account)}
         <details class="eaHistory"><summary>📜 Riwayat Trade &amp; P/L (${closed.length})</summary>
           <div class="eaHistoryScroll"><table><thead><tr><th>Waktu</th><th>Symbol</th><th>Side</th><th>Price</th><th>P/L</th></tr></thead><tbody>
             ${closed.slice(0,20).map(t=>`<tr><td>${t.time?esc(new Date(t.time).toLocaleString('id-ID')):'—'}</td><td>${esc(t.symbol||'—')}</td><td>${esc(t.type||'—')}</td><td>${t.price??'—'}</td><td class="${Number(t.profit)>=0?'positive':'negative'}">${money(t.profit)}</td></tr>`).join('')||'<tr><td colspan="5" class="muted center">Belum ada trade closed.</td></tr>'}
@@ -338,11 +397,12 @@
       floating+=snap?Number(snap.floating_profit||0):0;
     });
     const s=stats(allClosed.map(x=>({pl:Number(x.profit||0)})));
+    const pips=totalPips(allClosed);
     const daily=eaDailyPL(allClosed); const dvals=[...daily.values()];
     const bestDay=dvals.length?Math.max(...dvals):0, worstDay=dvals.length?Math.min(...dvals):0;
     const cons=eaConsistency(allClosed);
     setText('egAccounts',list.length);setText('egOnline',online);setText('egBalance',money(bal));setText('egEquity',money(eq));setText('egFloating',money(floating));setText('egPL',money(s.net));
-    setText('egTrades',s.n);setText('egWR',s.wr.toFixed(1)+'%');setText('egPF',s.pf.toFixed(2));setText('egAvgW',money(s.avgW));setText('egAvgL',money(-s.avgL));setText('egExp',money(s.exp));
+    setText('egTrades',s.n);setText('egWR',s.wr.toFixed(1)+'%');setText('egPF',s.pf.toFixed(2));setText('egPips',pips.toFixed(1));setText('egAvgW',money(s.avgW));setText('egAvgL',money(-s.avgL));setText('egExp',money(s.exp));
     setText('egDD',money(-s.dd));setText('egBest',money(bestDay));setText('egWorst',money(worstDay));setText('egCons',cons.ratio.toFixed(0)+'%');
     valueClass('egPL',s.net);valueClass('egFloating',floating);valueClass('egExp',s.exp);
   }
@@ -375,7 +435,7 @@
 
   function renderEA(){
     const closed=eaTrades.filter(isClosedEA); const s=stats(closed.map(x=>({pl:Number(x.profit||0)})));
-    setText('eaTrades',closed.length);setText('eaWR',s.wr.toFixed(1)+'%');setText('eaPL',money(s.net));setText('eaPF',s.pf.toFixed(2));
+    setText('eaTrades',closed.length);setText('eaWR',s.wr.toFixed(1)+'%');setText('eaPL',money(s.net));setText('eaPF',s.pf.toFixed(2));setText('eaPips',totalPips(closed).toFixed(1));
     const latest=[...eaTrades,...eaSnapshots].filter(x=>x?.time).sort((a,b)=>new Date(b.time)-new Date(a.time))[0];
     if(latest){setText('eaLast',latest.event||'—');setText('eaSide',latest.type||'—');setText('eaSymbol',latest.symbol||'—');setText('eaTime',new Date(latest.time).toLocaleString('id-ID'));setText('eaBadge',latest.event||'LIVE');document.querySelector('.live')?.classList.add('online');setText('liveText','ONLINE')}
     else {document.querySelector('.live')?.classList.remove('online');setText('liveText','WAITING');}
@@ -384,7 +444,7 @@
     renderGlobalEACalendar();
     const filter=$('eaAccountFilter')?.value||''; const rows=filter?eaTrades.filter(x=>eaAccountKey(x)===filter):eaTrades;
     setText('eaFilterLabel',filter?`AKUN ${filter}`:'SEMUA AKUN');
-    $('eaBody').innerHTML=rows.map(x=>`<tr><td>${x.time?esc(new Date(x.time).toLocaleString('id-ID')):'—'}</td><td><b>${esc(eaAccountKey(x))}</b></td><td>${esc(x.broker||'—')}</td><td>${esc(x.event||'—')}</td><td>${esc(x.symbol||'—')}</td><td>${esc(x.type||'—')}</td><td>${x.price??'—'}</td><td class="${Number(x.profit)>=0?'positive':'negative'}">${money(x.profit)}</td></tr>`).join('')||'<tr><td colspan="8" class="muted center">Belum ada data EA untuk akun ini.</td></tr>'
+    $('eaBody').innerHTML=rows.map(x=>`<tr><td>${x.time?esc(new Date(x.time).toLocaleString('id-ID')):'—'}</td><td><b>${esc(eaAccountKey(x))}</b></td><td>${esc(x.broker||'—')}</td><td>${esc(x.event||'—')}</td><td>${esc(x.symbol||'—')}</td><td>${esc(x.type||'—')}</td><td>${x.price??'—'}</td><td class="${Number(x.profit)>=0?'positive':'negative'}">${money(x.profit)}</td></tr>`).join('')||'<tr><td colspan="8" class="muted center">Belum ada data trade untuk akun ini.</td></tr>'
   }
 
   function exportCSV(){const headers=['trade_date','symbol','side','entry','exit','risk','pl','strategy','timeframe','session','notes'];const rows=trades.map(t=>headers.map(h=>`"${String(t[h]??'').replaceAll('"','""')}"`).join(','));const blob=new Blob([[headers.join(','),...rows].join('\n')],{type:'text/csv'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='inzakitrade-journal.csv';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),500)}
@@ -399,9 +459,10 @@
     $('eaPrevMonth')?.addEventListener('click',()=>{eaMonthCursor.setMonth(eaMonthCursor.getMonth()-1);renderEACalendar()});$('eaNextMonth')?.addEventListener('click',()=>{eaMonthCursor.setMonth(eaMonthCursor.getMonth()+1);renderEACalendar()});$('eaTodayMonth')?.addEventListener('click',()=>{eaMonthCursor=new Date();renderEACalendar()});
     $('gEaAccountFilter')?.addEventListener('change',renderGlobalEACalendar);$('gEaPrevMonth')?.addEventListener('click',()=>{gEaMonthCursor.setMonth(gEaMonthCursor.getMonth()-1);renderGlobalEACalendar()});$('gEaNextMonth')?.addEventListener('click',()=>{gEaMonthCursor.setMonth(gEaMonthCursor.getMonth()+1);renderGlobalEACalendar()});$('gEaTodayMonth')?.addEventListener('click',()=>{gEaMonthCursor=new Date();renderGlobalEACalendar()});['quickTrade','journalAdd'].forEach(id=>$(id)?.addEventListener('click',()=>{fillAccountSelects();show('tradeModal',true)}));
     $('tradeForm')?.addEventListener('submit',saveTrade);$('addAccount')?.addEventListener('click',()=>{editingAccount=null;$('accountForm').reset();show('accountModal',true)});$('accountForm')?.addEventListener('submit',saveAccount);$('addPayout')?.addEventListener('click',()=>{fillAccountSelects();show('payoutModal',true)});$('payoutForm')?.addEventListener('submit',savePayout);
-    $('addCert')?.addEventListener('click',()=>{fillAccountSelects();$('certForm')?.reset();msg('certMsg','');show('certModal',true)});$('certForm')?.addEventListener('submit',saveCertificate);
+    document.querySelectorAll('.addCertBtn').forEach(b=>b.addEventListener('click',()=>{fillAccountSelects();$('certForm')?.reset();msg('certMsg','');show('certModal',true)}));$('certForm')?.addEventListener('submit',saveCertificate);
     $('prevMonth')?.addEventListener('click',()=>{monthCursor.setMonth(monthCursor.getMonth()-1);renderCalendar()});$('nextMonth')?.addEventListener('click',()=>{monthCursor.setMonth(monthCursor.getMonth()+1);renderCalendar()});$('todayMonth')?.addEventListener('click',()=>{monthCursor=new Date();renderCalendar()});
-    document.addEventListener('click',e=>{const d=e.target.closest('[data-delete-trade]');if(d)deleteTrade(d.dataset.deleteTrade);const ed=e.target.closest('[data-edit-account]');if(ed)editAccount(ed.dataset.editAccount);const st=e.target.closest('[data-status-account]');if(st)changeStatus(st.dataset.statusAccount);const del=e.target.closest('[data-delete-account]');if(del)removeAccount(del.dataset.deleteAccount);const dc=e.target.closest('[data-delete-cert]');if(dc)deleteCertificate(dc.dataset.deleteCert);const day=e.target.closest('[data-date]');if(day){const date=day.dataset.date;$('fFrom').value=date;$('fTo').value=date;openPage('performance')}});
+    document.addEventListener('click',e=>{const d=e.target.closest('[data-delete-trade]');if(d)deleteTrade(d.dataset.deleteTrade);const ed=e.target.closest('[data-edit-account]');if(ed)editAccount(ed.dataset.editAccount);const del=e.target.closest('[data-delete-account]');if(del)removeAccount(del.dataset.deleteAccount);const dc=e.target.closest('[data-delete-cert]');if(dc)deleteCertificate(dc.dataset.deleteCert);const reg=e.target.closest('[data-register-ea]');if(reg)registerEaAsAccount(reg.dataset.registerEa);const day=e.target.closest('[data-date]');if(day){const date=day.dataset.date;$('fFrom').value=date;$('fTo').value=date;openPage('performance')}});
+    document.addEventListener('change',e=>{const s=e.target.closest('[data-status-select]');if(s)setAccountStatus(s.dataset.statusSelect,s.value);});
   }
   window.openPage=openPage;
   document.addEventListener('DOMContentLoaded',init);
